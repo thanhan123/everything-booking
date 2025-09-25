@@ -12,12 +12,12 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@types/testing-library__jest-dom": "^6.0.0",
     "next": "15.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@types/testing-library__jest-dom": "^6.0.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4.1.13",
     "@testing-library/jest-dom": "^6.8.0",
