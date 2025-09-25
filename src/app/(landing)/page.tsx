@@ -1,3 +1,5 @@
+'use client';
+
 import ServiceCard from "@/components/ServiceCard"
 
 export default async function LandingPage() {
