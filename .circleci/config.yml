@@ -31,7 +31,7 @@ jobs:
                 aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
                 region: ${AWS_REGION}
           region: ${AWS_REGION}
-          repo: ${ECR_REPOSITORY_NAME}
+          repo: everything-booking-app-repo
           tag: ${CIRCLE_SHA1} # Use commit SHA as tag
           # Path to your Dockerfile and context if not in root
           dockerfile: Dockerfile
