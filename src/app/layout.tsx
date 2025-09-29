@@ -1,21 +1,10 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import { Navbar } from "@/components/Navbar"
+import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Everything Booking",
-  description: "The platform supports all kinds of bookings",
-};
+export const metadata = {
+  title: "Booking App",
+  description: "A simple service booking platform",
+}
 
 export default function RootLayout({
   children,
@@ -24,11 +13,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-1">{children}</main>
+        <footer className="bg-gray-100 text-center py-4 text-sm text-gray-600">
+          © {new Date().getFullYear()} BookingApp. All rights reserved.
+        </footer>
       </body>
     </html>
-  );
+  )
 }

@@ -2,7 +2,7 @@
 
 import ServiceCard from "@/components/ServiceCard"
 
-export default async function LandingPage() {
+export default function LandingPage() {
     // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/services`)
     // const services = await res.json()
     const services = [
