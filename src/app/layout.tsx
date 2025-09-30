@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar"
+import { Providers } from "@/components/Providers"
 import "./globals.css"
 
 export const metadata = {
@@ -14,11 +15,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <footer className="bg-gray-100 text-center py-4 text-sm text-gray-600">
-          © {new Date().getFullYear()} BookingApp. All rights reserved.
-        </footer>
+        <Providers>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <footer className="bg-gray-100 text-center py-4 text-sm text-gray-600">
+            © {new Date().getFullYear()} BookingApp. All rights reserved.
+          </footer>
+        </Providers>
       </body>
     </html>
   )

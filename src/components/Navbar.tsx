@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { useState } from "react"
+import { UserMenu } from "./UserMenu"
 
 const navItems = [
     { label: "Search", href: "/search" },
-    { label: "Dashboard", href: "/dashboard" },
+    { label: "Dashboard", href: "/dashboard/bookings" },
 ]
 
 export function Navbar() {
@@ -38,6 +39,7 @@ export function Navbar() {
                         {item.label}
                     </Link>
                 ))}
+                <UserMenu />
             </div>
 
             {/* Mobile Menu */}
@@ -65,6 +67,7 @@ export function Navbar() {
                                     {item.label}
                                 </Link>
                             ))}
+                            <UserMenu />
                         </div>
                     </SheetContent>
                 </Sheet>
