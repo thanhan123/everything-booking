@@ -3,15 +3,18 @@
 import { useSession, signIn, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdownMenu"
-import { useRouter } from "next/navigation"
+import { useLoading } from "@/context/LoadingContext"
 
 export function UserMenu() {
     const { data: session } = useSession()
-    const router = useRouter()
+    const { setLoading } = useLoading()
 
     if (!session) {
         return (
-            <Button onClick={() => signIn()} variant="default">
+            <Button onClick={() => {
+                setLoading(true);
+                signIn();
+            }} variant="default">
                 Login
             </Button>
         )
@@ -27,6 +30,7 @@ export function UserMenu() {
             <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
                     onClick={async () => {
+                        setLoading(true)
                         await signOut({ callbackUrl: "/" })
                     }}
                 >

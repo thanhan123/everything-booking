@@ -1,6 +1,10 @@
+import { LoadingProvider } from "@/context/LoadingContext"
+import { LoadingOverlay } from "@/components/LoadingOverlay"
 import { Navbar } from "@/components/Navbar"
+import { useLoading } from "@/context/LoadingContext"
 import { Providers } from "@/components/Providers"
 import "./globals.css"
+import { ClientShell } from "@/components/ClientShell"
 
 export const metadata = {
   title: "Booking App",
@@ -16,11 +20,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="flex flex-col min-h-screen">
         <Providers>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <footer className="bg-gray-100 text-center py-4 text-sm text-gray-600">
-            © {new Date().getFullYear()} BookingApp. All rights reserved.
-          </footer>
+          <LoadingProvider>
+            <ClientShell>{children}</ClientShell>
+          </LoadingProvider>
         </Providers>
       </body>
     </html>
