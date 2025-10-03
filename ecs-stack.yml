@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CloudFormation template to deploy an Nextjs application to AWS ECS Fargate.
+  This template creates an ECS Cluster, Task Definition, Service,
+  Application Load Balancer, Target Group, Security Groups, and IAM Roles.
+
+Parameters:
+  # --- Application Parameters ---
+  AppName:
+    Type: String
+    Description: A unique name for your application. This will be used in resource names.
+    Default: everything-booking-app
+
+  ImageRepositoryName:
+    Type: String
+    Description: The name of your ECR repository (e.g., 'my-express-app-repo').
+    # This should match the ECR_REPOSITORY_NAME in your CircleCI config
+    Default: everything-booking-app-repo
+
+  ImageTag:
+    Type: String
+    Description: The Docker image tag to deploy (e.g., 'latest' or a specific SHA from CircleCI).
+    # This will be passed from your CI/CD pipeline, e.g., CIRCLE_SHA1
+    Default: latest
+
+  ContainerPort:
+    Type: Number
+    Description: The port your Express.js application listens on inside the container.
+    Default: 3000
+
+  DesiredCount:
+    Type: Number
+    Description: The desired number of running tasks for your service.
+    Default: 1
+
+  # --- Network Parameters ---
+  VpcId:
+    Type: String
+    Description: The ID of the VPC where your ECS cluster and ALB will be deployed.
+    # You should use an existing VPC ID
+    # Example: vpc-0abcdef1234567890
+
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
+    # Ensure these subnets are public for ALB if using a public ALB
+    # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
+
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
+    # Ensure these subnets are private for tasks
+    # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
+
+  # --- Resource Sizing Parameters ---
+  TaskCpu:
+    Type: String
+    Description: The CPU units for the Fargate task (e.g., 256, 512, 1024, 2048, 4096).
+    AllowedValues: [ "256", "512", "1024", "2048", "4096" ]
+    Default: "256" # 0.25 vCPU
+
+  TaskMemory:
+    Type: String
+    Description: The memory (in MiB) for the Fargate task. Must be compatible with TaskCpu.
+    # See AWS Fargate documentation for valid CPU/Memory combinations.
+    # For 256 CPU: 512, 1024, 2048
+    # For 512 CPU: 1024, 2048, 3072, 4096
+    # For 1024 CPU: 2048, 3072, 4096, 5120, 6144, 7168, 8192
+    Default: "512" # 0.5 GB
+
+Resources:
+  # --- IAM Roles ---
+  # IAM Role for ECS Task Execution (Allows ECS to pull images, log to CloudWatch)
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Path: /
+
+  # IAM Role for ECS Task (If your application needs to interact with other AWS services, e.g., S3, DynamoDB)
+  # For a simple Express app, this might not be strictly necessary, but it's good practice.
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${AppName}-TaskAccessPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}-LogGroup:*
+
+  # --- Log Group for ECS Tasks ---
+  EcsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${AppName}-LogGroup
+      RetentionInDays: 7 # Adjust retention as needed
+
+  # --- ECS Cluster ---
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${AppName}-Cluster
+
+  # --- Security Groups ---
+  # Security Group for the Application Load Balancer
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 # Allow HTTP access from anywhere
+        # Add HTTPS if you plan to use it
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-ALB-SG
+
+  # Security Group for ECS Fargate Tasks
+  EcsTaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ECS Fargate tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # Allow traffic from the ALB to the container port
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+      SecurityGroupEgress:
+        - IpProtocol: -1 # Allow all outbound traffic (e.g., to the internet, databases)
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-ECS-Task-SG
+
+  # --- Application Load Balancer (ALB) ---
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing # Or 'internal' if only accessible within VPC
+      Subnets: !Ref SubnetIds
+      SecurityGroups:
+        - !GetAtt ALBSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-ALB
+
+  # ALB Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: / # Your Express.js health check endpoint
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: ip # Fargate uses IP addresses
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-TargetGroup
+
+  # ALB Listener (HTTP on port 80)
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # --- ECS Task Definition ---
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AppName}-TaskDefinition
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      NetworkMode: awsvpc # Required for Fargate
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn # Role for ECS agent
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn # Role for your application
+      ContainerDefinitions:
+        - Name: !Sub ${AppName}-Container
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageRepositoryName}:${ImageTag}
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              HostPort: !Ref ContainerPort # Not strictly needed for Fargate, but good practice
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref EcsLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  # --- ECS Service ---
+  EcsService:
+    Type: AWS::ECS::Service
+    DependsOn: HTTPListener
+    Properties:
+      Cluster: !Ref EcsCluster
+      ServiceName: !Sub ${AppName}-Service
+      TaskDefinition: !Ref EcsTaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED # Set to ENABLED if tasks need public internet access (e.g., for outbound calls)
+                                   # or if ALB is internal and tasks are in private subnets with NAT Gateway.
+                                   # For public ALB, tasks in private subnets with NAT Gateway is typical.
+          Subnets: !Ref PrivateSubnetIds
+          SecurityGroups:
+            - !GetAtt EcsTaskSecurityGroup.GroupId
+      LoadBalancers:
+        - ContainerName: !Sub ${AppName}-Container
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroup
+      # Optional: Auto Scaling (uncomment and configure if needed)
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-Service
+
+Outputs:
+  ClusterName:
+    Description: The name of the ECS Cluster
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub ${AppName}-ClusterName
+
+  LoadBalancerDNS:
+    Description: The DNS name of the Application Load Balancer
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub ${AppName}-LoadBalancerDNS
+
+  ServiceArn:
+    Description: The ARN of the ECS Service
+    Value: !Ref EcsService
+    Export:
+      Name: !Sub ${AppName}-ServiceArn

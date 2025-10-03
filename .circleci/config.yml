@@ -1,0 +1,79 @@
+# CircleCI 2.1 configuration
+version: 2.1
+
+orbs:
+  node: circleci/node@5.0.0
+  aws-cli: circleci/aws-cli@4.1.0
+  aws-ecr: circleci/aws-ecr@9.5.4
+
+jobs:
+  build-and-push-docker-image:
+    docker:
+      - image: cimg/node:18.20.2
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Install Node.js dependencies
+          command: npm install
+      - run:
+          name: Run tests (placeholder)
+          command: npm test
+      - aws-cli/setup:
+          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+          region: ${AWS_REGION}
+      - aws-ecr/build_and_push_image:
+          account_id: ${AWS_ACCOUNT_ID}
+          auth:
+            - aws-cli/setup:
+                aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+                aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+                region: ${AWS_REGION}
+          region: ${AWS_REGION}
+          repo: everything-booking-app-repo
+          tag: ${CIRCLE_SHA1} # Use commit SHA as tag
+          # Path to your Dockerfile and context if not in root
+          dockerfile: Dockerfile
+          # path: .
+
+  deploy-to-ecs-fargate:
+    docker:
+      - image: cimg/base:2025.08
+    steps:
+      - checkout
+      - aws-cli/setup:
+          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+          region: ${AWS_REGION}
+      - run:
+          name: Deploy CloudFormation Stack
+          command: |
+            aws cloudformation deploy \
+              --stack-name ${APP_NAME}-FargateStack \
+              --template-file ecs-stack.yml \
+              --capabilities CAPABILITY_IAM \
+              --parameter-overrides \
+                AppName=${APP_NAME} \
+                ImageTag=${CIRCLE_SHA1} \
+                SubnetIds=${AWS_SUBNET_IDS} \
+                PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
+                VpcId=${AWS_VPC_ID} \
+              --region ${AWS_REGION}
+    environment:
+      APP_NAME: everything-booking
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build-and-push-docker-image:
+          filters:
+            branches:
+              only: main
+      - deploy-to-ecs-fargate:
+          requires:
+            - build-and-push-docker-image # This job runs after the Docker image is pushed
+          filters:
+            branches:
+              only: main
