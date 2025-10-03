@@ -70,10 +70,10 @@ workflows:
       - build-and-push-docker-image:
           filters:
             branches:
-              only: add-cicd
+              only: main
       - deploy-to-ecs-fargate:
           requires:
             - build-and-push-docker-image # This job runs after the Docker image is pushed
           filters:
             branches:
-              only: add-cicd
+              only: main
