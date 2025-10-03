@@ -58,7 +58,7 @@ jobs:
                 ImageRepositoryName=${ECR_REPOSITORY_NAME} \
                 ImageTag=${CIRCLE_SHA1} \
                 SubnetIds=${AWS_SUBNET_IDS} \
-                PrivateSubnetIds=subnet-05eff67f52458811e,subnet-05eff67f52458812e \
+                PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
               --region ${AWS_REGION}
     environment:
