@@ -3,7 +3,7 @@ import { useState } from "react"
 
 export default function SearchPage() {
     const [query, setQuery] = useState("")
-    const [results, setResults] = useState<string[]>([])
+    const [results, setResults] = useState<{ id: string; name: string; price: number }[]>([])
 
     async function handleSearch() {
         const res = await fetch(`/api/services/search?q=${query}`)

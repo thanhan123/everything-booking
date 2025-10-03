@@ -11,7 +11,7 @@ export default async function DashboardServices() {
         <main className="p-8">
             <h1 className="text-2xl font-bold mb-4">My Services</h1>
             <ul>
-                {services.map((s: any) => (
+                {services.map((s) => (
                     <li key={s.id} className="border p-2 mb-2">{s.name} - ${s.price}</li>
                 ))}
             </ul>
