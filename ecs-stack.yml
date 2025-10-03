@@ -43,7 +43,13 @@ Parameters:
   SubnetIds:
     Type: CommaDelimitedList
     Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
-    # Ensure these subnets are private for tasks and public for ALB if using a public ALB
+    # Ensure these subnets are public for ALB if using a public ALB
+    # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
+
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
+    # Ensure these subnets are private for tasks
     # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
 
   # --- Resource Sizing Parameters ---
@@ -236,10 +242,10 @@ Resources:
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED # Set to ENABLED if tasks need public internet access (e.g., for outbound calls)
+          AssignPublicIp: DISABLED # Set to ENABLED if tasks need public internet access (e.g., for outbound calls)
                                    # or if ALB is internal and tasks are in private subnets with NAT Gateway.
                                    # For public ALB, tasks in private subnets with NAT Gateway is typical.
-          Subnets: !Ref SubnetIds
+          Subnets: !Ref PrivateSubnetIds
           SecurityGroups:
             - !GetAtt EcsTaskSecurityGroup.GroupId
       LoadBalancers:
