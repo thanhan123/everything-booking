@@ -57,9 +57,9 @@ jobs:
                 AppName=${APP_NAME} \
                 ImageRepositoryName=${ECR_REPOSITORY_NAME} \
                 ImageTag=${CIRCLE_SHA1} \
-                VpcId=${AWS_VPC_ID} \
                 SubnetIds=${AWS_SUBNET_IDS} \
-                PrivateSubnetIds={AWS_PRIVATE_SUBNET_IDS} \
+                PrivateSubnetIds=subnet-05eff67f52458811e,subnet-05eff67f52458812e \
+                VpcId=${AWS_VPC_ID} \
               --region ${AWS_REGION}
     environment:
       APP_NAME: everything-booking
