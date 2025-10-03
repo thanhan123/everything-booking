@@ -59,7 +59,7 @@ jobs:
                 ImageTag=${CIRCLE_SHA1} \
                 VpcId=${AWS_VPC_ID} \
                 SubnetIds=${AWS_SUBNET_IDS} \
-                PrivateSubnetIds={AWS_PRIVATE_SUBNET_IDS}
+                PrivateSubnetIds={AWS_PRIVATE_SUBNET_IDS} \
               --region ${AWS_REGION}
     environment:
       APP_NAME: everything-booking
