@@ -12,7 +12,9 @@ jobs:
       - image: cimg/node:18.20.2
     steps:
       - checkout
-      - node/install-dependencies # Use the orb command for clean install
+      - node/install-dependencies:
+          pkg-manager: npm
+          install-command: "npm ci"
       - run:
           name: Run tests
           command: npm test
@@ -23,9 +25,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run:
-          name: Install Node.js dependencies
-          command: npm install
+      - node/install-dependencies:
+          pkg-manager: npm
+          install-command: "npm ci"
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
           aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
