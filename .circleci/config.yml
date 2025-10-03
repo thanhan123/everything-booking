@@ -7,6 +7,16 @@ orbs:
   aws-ecr: circleci/aws-ecr@9.5.4
 
 jobs:
+  run-tests: # NEW JOB
+    docker:
+      - image: cimg/node:18.20.2
+    steps:
+      - checkout
+      - node/install-dependencies # Use the orb command for clean install
+      - run:
+          name: Run tests
+          command: npm test
+          
   build-and-push-docker-image:
     docker:
       - image: cimg/node:18.20.2
@@ -16,9 +26,6 @@ jobs:
       - run:
           name: Install Node.js dependencies
           command: npm install
-      - run:
-          name: Run tests (placeholder)
-          command: npm test
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
           aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
@@ -67,13 +74,18 @@ workflows:
   version: 2
   build-deploy:
     jobs:
+      - run-tests
+
       - build-and-push-docker-image:
           filters:
             branches:
               only: main
+          requires:
+            - run-tests
+
       - deploy-to-ecs-fargate:
           requires:
-            - build-and-push-docker-image # This job runs after the Docker image is pushed
+            - build-and-push-docker-image
           filters:
             branches:
               only: main
