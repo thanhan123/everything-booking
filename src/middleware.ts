@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    const [_, allowedRoles] = matched
+    const allowedRoles = matched[1];
 
     // Get the session token from cookies
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })

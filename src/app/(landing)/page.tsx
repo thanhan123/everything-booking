@@ -15,7 +15,7 @@ export default function LandingPage() {
         <main className="p-8">
             <h1 className="text-3xl font-bold mb-4">Available Services</h1>
             <div className="grid grid-cols-3 gap-6">
-                {services.map((service: any) => (
+                {services.map((service) => (
                     <ServiceCard
                         key={service.id}
                         name={service.name}

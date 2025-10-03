@@ -1,7 +1,4 @@
 import { LoadingProvider } from "@/context/LoadingContext"
-import { LoadingOverlay } from "@/components/LoadingOverlay"
-import { Navbar } from "@/components/Navbar"
-import { useLoading } from "@/context/LoadingContext"
 import { Providers } from "@/components/Providers"
 import "./globals.css"
 import { ClientShell } from "@/components/ClientShell"

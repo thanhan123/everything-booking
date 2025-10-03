@@ -12,8 +12,6 @@ export function LoadingOverlay({ isLoading }: { isLoading: boolean }) {
     const [visible, setVisible] = useState(isLoading)
     const pathname = usePathname()
 
-    console.log('***> call here');
-
     // When the route changes, hide the loader automatically
     useEffect(() => {
         if (isLoading) return
