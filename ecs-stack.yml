@@ -232,9 +232,9 @@ Resources:
               Protocol: tcp
           secrets:
             - name: DATABASE_URL
-              valueFrom: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables
+              valueFrom: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:DATABASE_URL::
             - name: AUTH_SECRET
-              valueFrom: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables
+              valueFrom: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:AUTH_SECRET::
           Environment:
             - Name: NODE_ENV
               Value: production
