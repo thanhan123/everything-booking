@@ -164,7 +164,7 @@ workflows:
       - build-and-push-docker-image:
           filters:
             branches:
-              only: main
+              only: hot-fix-3
           requires:
             - run-tests
 
