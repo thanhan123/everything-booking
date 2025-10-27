@@ -180,9 +180,9 @@ workflows:
       - deploy-network-stack:
           filters:
             branches:
-              only: database-deploy-2
+              only: database-deploy
       - deploy-database:
           requires: [deploy-network-stack]
           filters:
             branches:
-              only: database-deploy-2
+              only: database-deploy
