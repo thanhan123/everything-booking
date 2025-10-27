@@ -83,6 +83,16 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Path: /
+      Policies:
+        - PolicyName: AllowSecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables*
 
   # IAM Role for ECS Task (If your application needs to interact with other AWS services, e.g., S3, DynamoDB)
   # For a simple Express app, this might not be strictly necessary, but it's good practice.
