@@ -94,7 +94,7 @@ jobs:
                 ImageTag=${CIRCLE_SHA1} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
-              --region ${AWS_REGION}
+              --region ${AWS_REGION} \
               --no-fail-on-empty-changeset
 
 workflows:
