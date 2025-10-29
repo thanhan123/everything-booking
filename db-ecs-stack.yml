@@ -46,17 +46,17 @@ Resources:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EFSFileSystem
-      SubnetId: !Ref Subnet1
+      SubnetId: !Select [0, !Ref PrivateSubnetIds]
       SecurityGroups:
-        - !Ref SecurityGroupId
+        - !Ref DatabaseSecurityGroup
 
   MountTarget2:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EFSFileSystem
-      SubnetId: !Ref Subnet2
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
       SecurityGroups:
-        - !Ref SecurityGroupId
+        - !Ref DatabaseSecurityGroup
 
   # 🔹 EFS Access Point (for scoped folder)
   EFSAccessPoint:
