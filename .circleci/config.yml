@@ -89,7 +89,7 @@ jobs:
             aws cloudformation deploy \
               --stack-name ${APP_NAME}-database-FargateStack \
               --template-file db-ecs-stack.yml \
-              --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+              --capabilities CAPABILITY_IAM \
               --parameter-overrides \
                 ImageTag=${CIRCLE_SHA1} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
