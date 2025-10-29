@@ -116,7 +116,7 @@ Resources:
               AccessPointId: !Ref EFSAccessPoint
       ContainerDefinitions:
         - Name: postgres
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageRepositoryName}:${ImageTag}"
+          Image: postgres:16
           PortMappings:
             - ContainerPort: !Ref ContainerPort
           MountPoints:
