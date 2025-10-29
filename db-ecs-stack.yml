@@ -143,11 +143,17 @@ Resources:
           ToPort: 5432
           SourceSecurityGroupId: !Ref AppSecurityGroup
 
+  # --- ECS Cluster ---
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${AppName}-postgres-Cluster
+
   # 🔹 ECS Service
   EcsService:
     Type: AWS::ECS::Service
     Properties:
-      Cluster: !ImportValue ${AppName}-cluster
+      Cluster: !Ref EcsCluster
       LaunchType: FARGATE
       DesiredCount: 1
       TaskDefinition: !Ref EcsTaskDefinition
