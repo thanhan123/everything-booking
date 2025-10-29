@@ -87,15 +87,15 @@ jobs:
           name: Deploy database stack
           command: |
             aws cloudformation deploy \
-              --stack-name "${APP_NAME}-database-FargateStack" \
+              --stack-name ${APP_NAME}-database-FargateStack \
               --template-file db-ecs-stack.yml \
               --capabilities CAPABILITY_IAM \
               --parameter-overrides \
-                ImageTag="${CIRCLE_SHA1}" \
-                PrivateSubnetIds="${AWS_PRIVATE_SUBNET_IDS}" \
-                VpcId="${AWS_VPC_ID}" \
-              --region "${AWS_REGION}" \
-              --no-fail-on-empty-changeset
+                ImageTag=${CIRCLE_SHA1} \
+                SubnetIds=${AWS_SUBNET_IDS} \
+                PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
+                VpcId=${AWS_VPC_ID} \
+              --region ${AWS_REGION}
 
 workflows:
   version: 2
