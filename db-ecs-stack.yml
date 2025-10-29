@@ -123,7 +123,7 @@ Resources:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref EcsLogGroup
-              awslogs-region: !Ref ${AWS::Region}
+              awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
   DatabaseSecurityGroup:
