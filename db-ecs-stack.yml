@@ -126,16 +126,22 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: App SG
+      VpcId: !Ref VpcId
+
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow DB access from ECS App
+      GroupDescription: DB SG
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-          SourceSecurityGroupId: !Ref EcsServiceSecurityGroup
+          SourceSecurityGroupId: !Ref AppSecurityGroup
 
   # 🔹 ECS Service
   EcsService:
