@@ -72,6 +72,36 @@ jobs:
     environment:
       APP_NAME: everything-booking
 
+  deploy-database:
+    docker:
+      - image: cimg/python:3.11  # or another image with aws-cli & cfn tools
+    steps:
+      - checkout
+
+      - aws-cli/setup:
+          aws-access-key-id: ${AWS_ACCESS_KEY_ID}
+          aws-secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+          aws-region: ${AWS_REGION}
+
+      - run:
+          name: Validate CloudFormation template
+          command: |
+            aws cloudformation validate-template \
+              --template-body db-ecs-stack.yml
+
+      - run:
+          name: Deploy database stack
+          command: |
+            aws cloudformation deploy \
+              --template-file db-ecs-stack.yml \
+              --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+              --parameter-overrides \
+                ImageTag=${CIRCLE_SHA1} \
+                PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
+                VpcId=${AWS_VPC_ID} \
+              --region ${AWS_REGION}
+              --no-fail-on-empty-changeset
+
 workflows:
   version: 2
   build-deploy:
@@ -91,3 +121,8 @@ workflows:
           filters:
             branches:
               only: main
+
+      - deploy-database:
+          filters:
+            branches:
+              only: /^database-deploy\/.*/
