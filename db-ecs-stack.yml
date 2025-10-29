@@ -47,16 +47,22 @@ Resources:
     Properties:
       FileSystemId: !Ref EFSFileSystem
       SubnetId: !Select [0, !Ref PrivateSubnetIds]
-      SecurityGroups:
-        - !Ref DatabaseSecurityGroup
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref DatabaseSecurityGroup
 
   MountTarget2:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EFSFileSystem
       SubnetId: !Select [1, !Ref PrivateSubnetIds]
-      SecurityGroups:
-        - !Ref DatabaseSecurityGroup
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref DatabaseSecurityGroup
 
   # 🔹 EFS Access Point (for scoped folder)
   EFSAccessPoint:
