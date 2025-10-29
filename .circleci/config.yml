@@ -127,4 +127,4 @@ workflows:
       - deploy-database:
           filters:
             branches:
-              only: /^database-deploy\/.*/
+              only: database-deploy-2
