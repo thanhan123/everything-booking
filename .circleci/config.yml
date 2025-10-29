@@ -122,6 +122,8 @@ workflows:
             branches:
               only: main
 
+  database-deploy:
+    jobs:
       - deploy-database:
           filters:
             branches:
