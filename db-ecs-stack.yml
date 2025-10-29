@@ -19,8 +19,6 @@ Parameters:
   PrivateSubnetIds:
     Type: CommaDelimitedList
     Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
-  SecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
 
 Resources:
   # 🔹 Log Group for container logs

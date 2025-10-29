@@ -87,7 +87,7 @@ jobs:
           name: Deploy database stack
           command: |
             aws cloudformation deploy \
-              --stack-name everything-booking-database-FargateStack \
+              --stack-name ${APP_NAME}-database-FargateStack \
               --template-file db-ecs-stack.yml \
               --capabilities CAPABILITY_IAM \
               --parameter-overrides \
@@ -97,6 +97,8 @@ jobs:
                 VpcId=${AWS_VPC_ID} \
               --region ${AWS_REGION} \
               --no-fail-on-empty-changeset
+    environment:
+      APP_NAME: everything-booking
 
 workflows:
   version: 2
