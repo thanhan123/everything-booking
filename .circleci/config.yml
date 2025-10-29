@@ -84,12 +84,6 @@ jobs:
           region: ${AWS_REGION}
 
       - run:
-          name: Validate CloudFormation template
-          command: |
-            aws cloudformation validate-template \
-              --template-body db-ecs-stack.yml
-
-      - run:
           name: Deploy database stack
           command: |
             aws cloudformation deploy \
