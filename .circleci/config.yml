@@ -87,7 +87,7 @@ jobs:
           name: Deploy database stack
           command: |
             aws cloudformation deploy \
-              --stack-name ${APP_NAME}-database-FargateStack \
+              --stack-name everything-booking-database-FargateStack \
               --template-file db-ecs-stack.yml \
               --capabilities CAPABILITY_IAM \
               --parameter-overrides \
@@ -95,7 +95,8 @@ jobs:
                 SubnetIds=${AWS_SUBNET_IDS} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
-              --region ${AWS_REGION}
+              --region ${AWS_REGION} \
+              --no-fail-on-empty-changeset
 
 workflows:
   version: 2
