@@ -4,7 +4,7 @@ Description: Deploy PostgreSQL container to ECS Fargate
 Parameters:
   AppName:
     Type: String
-    Default: everything-booking-db
+    Default: everything-booking-postgres-db
   ContainerPort:
     Type: Number
     Default: 5432
@@ -180,6 +180,32 @@ Resources:
           ToPort: 5432
           SourceSecurityGroupId: !GetAtt DatabaseSecurityGroup.GroupId
 
+  # 🔹 New Resource: Cloud Map Private DNS Namespace
+  PrivateNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub "${AppName}.local" # Creates a domain like 'everything-booking-db.local'
+      Vpc: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-namespace"
+
+  # 🔹 New Resource: Service Discovery Service (The static DNS entry)
+  PostgresServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      # This name becomes the host part: 'postgres.everything-booking-db.local'
+      Name: postgres 
+      NamespaceId: !Ref PrivateNamespace
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        # MULTIVALUE routing policy returns up to 8 healthy task IPs, suitable for DB connection
+        RoutingPolicy: MULTIVALUE 
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
   # --- ECS Cluster ---
   EcsCluster:
     Type: AWS::ECS::Cluster
@@ -200,3 +226,6 @@ Resources:
           SecurityGroups:
             - !Ref DatabaseSecurityGroup
           Subnets: !Ref PrivateSubnetIds
+      # New Property: Links the service to the Service Discovery entry
+      ServiceRegistries:
+        - RegistryArn: !GetAtt PostgresServiceDiscovery.Arn # <-- ADDED
