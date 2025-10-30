@@ -180,6 +180,17 @@ Resources:
       FromPort: 2049
       ToPort: 2049
 
+  # 🔹 New Resource: EFS Outbound Rule (Port 2049)
+  EfsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      DestinationSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 2049
+      ToPort: 2049
+      Description: Allow EFS access to mount target (outbound)
+
   # 🔹 New Resource: Postgres Ingress Rule (Port 5432)
   PostgresIngressRule:
     Type: AWS::EC2::SecurityGroupIngress
@@ -189,6 +200,40 @@ Resources:
       SourceSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference (Replace with App SG later)
       FromPort: 5432
       ToPort: 5432
+
+  # 🔹 New Resource: EFS Outbound Rule (Port 2049)
+  PostgresEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      DestinationSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 5432
+      ToPort: 5432
+
+  # 🔹 New Resource: General HTTPS Outbound Rule (For ECR/CloudWatch)
+  # Fargate tasks in private subnets MUST have this to pull the image and send logs.
+  GeneralHttpsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      CidrIp: 0.0.0.0/0 
+      FromPort: 443
+      ToPort: 443
+      Description: Allow outbound HTTPS for ECR, CloudWatch, and general AWS API access
+
+  # 🔹 New Resource: DNS Resolver Egress Rule (For Service Discovery)
+  # Allows task to query the VPC's DNS resolver for the Service Discovery record.
+  DnsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: udp # DNS primarily uses UDP
+      CidrIp: 0.0.0.0/0 # Simplest way to allow outbound DNS lookups
+      FromPort: 53
+      ToPort: 53
+      Description: Allow outbound DNS resolution for Service Discovery
 
   # 🔹 New Resource: Cloud Map Private DNS Namespace
   PrivateNamespace:
