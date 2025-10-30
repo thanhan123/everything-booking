@@ -169,16 +169,26 @@ Resources:
     Properties:
       VpcId: !Ref VpcId
       GroupDescription: Security group for ECS tasks DB and EFS mount targets
-      SecurityGroupIngress:
-        # Allow inbound TCP on port 2049 (NFS) from itself (ECS tasks can talk to EFS)
-        - IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-          SourceSecurityGroupId: !GetAtt DatabaseSecurityGroup.GroupId # <-- SELF-REFERENCE
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !GetAtt DatabaseSecurityGroup.GroupId
+
+  # 🔹 New Resource: EFS Ingress Rule (Port 2049)
+  EfsIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 2049
+      ToPort: 2049
+
+  # 🔹 New Resource: Postgres Ingress Rule (Port 5432)
+  PostgresIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference (Replace with App SG later)
+      FromPort: 5432
+      ToPort: 5432
 
   # 🔹 New Resource: Cloud Map Private DNS Namespace
   PrivateNamespace:
