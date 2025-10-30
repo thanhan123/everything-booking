@@ -50,16 +50,13 @@ Resources:
       SecurityGroups:
         - !Ref DatabaseSecurityGroup
 
-  # MountTarget2:
-  #   Type: AWS::EFS::MountTarget
-  #   Properties:
-  #     FileSystemId: !Ref EFSFileSystem
-  #     SubnetId: !Select [1, !Ref PrivateSubnetIds]
-  #     SecurityGroupIngress:
-  #       - IpProtocol: tcp
-  #         FromPort: 2049
-  #         ToPort: 2049
-  #         SourceSecurityGroupId: !Ref DatabaseSecurityGroup
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref DatabaseSecurityGroup
 
   # 🔹 EFS Access Point (for scoped folder)
   EFSAccessPoint:
@@ -75,6 +72,33 @@ Resources:
           OwnerUid: "999"
           OwnerGid: "999"
           Permissions: "755"
+
+  # 🔹 ECS Task Role (Required for EFS Access Permissions)
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: [ecs-tasks.amazonaws.com] }
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: EFSMountPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'elasticfilesystem:ClientMount'
+                  - 'elasticfilesystem:ClientRootAccess'
+                Resource: !GetAtt EFSFileSystem.Arn
+                Condition:
+                  StringEquals:
+                    'elasticfilesystem:AccessPointArn': !GetAtt EFSAccessPoint.Arn
+              - Effect: Allow
+                Action:
+                  - 'elasticfilesystem:DescribeMountTargets'
+                Resource: '*'
 
   # 🔹 ECS Execution Role
   EcsTaskExecutionRole:
@@ -110,6 +134,7 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
       ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn # <--- ADDED: Task Role ARN
       Volumes:
         - Name: postgres-data
           EFSVolumeConfiguration:
@@ -139,27 +164,21 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
-  AppSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: App SG
-      VpcId: !Ref VpcId
-
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: DB SG
       VpcId: !Ref VpcId
+      GroupDescription: Security group for ECS tasks DB and EFS mount targets
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref AppSecurityGroup
         # Allow inbound TCP on port 2049 (NFS) from itself (ECS tasks can talk to EFS)
         - IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
-          SourceSecurityGroupId: !Ref AppSecurityGroup
+          SourceSecurityGroupId: !GetAtt DatabaseSecurityGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !GetAtt DatabaseSecurityGroup.GroupId
 
   # --- ECS Cluster ---
   EcsCluster:
