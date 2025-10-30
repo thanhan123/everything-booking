@@ -47,22 +47,19 @@ Resources:
     Properties:
       FileSystemId: !Ref EFSFileSystem
       SubnetId: !Select [0, !Ref PrivateSubnetIds]
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-          SourceSecurityGroupId: !Ref DatabaseSecurityGroup
+      SecurityGroups:
+        - !Ref DatabaseSecurityGroup
 
-  MountTarget2:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EFSFileSystem
-      SubnetId: !Select [1, !Ref PrivateSubnetIds]
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-          SourceSecurityGroupId: !Ref DatabaseSecurityGroup
+  # MountTarget2:
+  #   Type: AWS::EFS::MountTarget
+  #   Properties:
+  #     FileSystemId: !Ref EFSFileSystem
+  #     SubnetId: !Select [1, !Ref PrivateSubnetIds]
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 2049
+  #         ToPort: 2049
+  #         SourceSecurityGroupId: !Ref DatabaseSecurityGroup
 
   # 🔹 EFS Access Point (for scoped folder)
   EFSAccessPoint:
@@ -158,6 +155,11 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           SourceSecurityGroupId: !Ref AppSecurityGroup
+        # Allow inbound TCP on port 2049 (NFS) from itself (ECS tasks can talk to EFS)
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref DatabaseSecurityGroup
 
   # --- ECS Cluster ---
   EcsCluster:
