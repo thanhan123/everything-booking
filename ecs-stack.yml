@@ -72,6 +72,10 @@ Parameters:
     Type: String
     Description: The ID of the App Security Group imported from the network stack.
 
+  ALBSecurityGroupId:
+    Type: String
+    Description: The ID of the ALB Security Group imported from the network stack.
+
 Resources:
   # --- IAM Roles ---
   # IAM Role for ECS Task Execution (Allows ECS to pull images, log to CloudWatch)
@@ -133,27 +137,6 @@ Resources:
     Properties:
       ClusterName: !Sub ${AppName}-Cluster
 
-  # --- Security Groups ---
-  # Security Group for the Application Load Balancer
-  ALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ALB
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0 # Allow HTTP access from anywhere
-        # Add HTTPS if you plan to use it
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-ALB-SG
-
   # --- Application Load Balancer (ALB) ---
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -161,7 +144,7 @@ Resources:
       Scheme: internet-facing # Or 'internal' if only accessible within VPC
       Subnets: !Ref SubnetIds
       SecurityGroups:
-        - !GetAtt ALBSecurityGroup.GroupId
+        - !Ref ALBSecurityGroupId
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-ALB

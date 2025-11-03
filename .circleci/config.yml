@@ -69,6 +69,7 @@ jobs:
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
                 AppSecurityGroupId=${APP_SG_ID} \
+                ALBSecurityGroupId=${APP_ALB_SG_ID} \
               --region ${AWS_REGION}
     environment:
       APP_NAME: everything-booking
