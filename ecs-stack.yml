@@ -68,6 +68,10 @@ Parameters:
     # For 1024 CPU: 2048, 3072, 4096, 5120, 6144, 7168, 8192
     Default: "512" # 0.5 GB
 
+  AppSecurityGroupId:
+    Type: String
+    Description: The ID of the App Security Group imported from the network stack.
+
 Resources:
   # --- IAM Roles ---
   # IAM Role for ECS Task Execution (Allows ECS to pull images, log to CloudWatch)
@@ -149,71 +153,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-ALB-SG
-
-  # 🔹 New Resource: EFS Outbound Rule (Port 2049)
-  EfsEgressRule:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref EcsTaskSecurityGroup
-      IpProtocol: tcp
-      DestinationSecurityGroupId: !Ref EcsTaskSecurityGroup
-      FromPort: 2049
-      ToPort: 2049
-      Description: Allow EFS access to mount target (outbound)
-
-  # 🔹 New Resource: General HTTPS Outbound Rule (For ECR/CloudWatch)
-  # Fargate tasks in private subnets MUST have this to pull the image and send logs.
-  GeneralHttpsEgressRule:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref EcsTaskSecurityGroup
-      IpProtocol: tcp
-      CidrIp: 0.0.0.0/0 
-      FromPort: 443
-      ToPort: 443
-      Description: Allow outbound HTTPS for ECR, CloudWatch, and general AWS API access
-
-  # 🔹 New Resource: DNS Resolver Egress Rule (For Service Discovery)
-  # Allows task to query the VPC's DNS resolver for the Service Discovery record.
-  DnsEgressRule:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref EcsTaskSecurityGroup
-      IpProtocol: udp # DNS primarily uses UDP
-      CidrIp: 0.0.0.0/0 # Simplest way to allow outbound DNS lookups
-      FromPort: 53
-      ToPort: 53
-      Description: Allow outbound DNS resolution for Service Discovery
-
-  # The PostgresEgressRule is not strictly necessary unless you have other services
-  # connecting to it, but if you want to keep a general egress rule for the SG:
-  PostgresEgressRule:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref EcsTaskSecurityGroup
-      IpProtocol: tcp
-      DestinationSecurityGroupId: !Ref EcsTaskSecurityGroup # Self-reference
-      FromPort: 5432
-      ToPort: 5432
-
-  # Security Group for ECS Fargate Tasks
-  EcsTaskSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ECS Fargate tasks
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        # Allow traffic from the ALB to the container port
-        - IpProtocol: tcp
-          FromPort: !Ref ContainerPort
-          ToPort: !Ref ContainerPort
-          SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
-      SecurityGroupEgress:
-        - IpProtocol: -1 # Allow all outbound traffic (e.g., to the internet, databases)
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-ECS-Task-SG
 
   # --- Application Load Balancer (ALB) ---
   LoadBalancer:
@@ -308,7 +247,7 @@ Resources:
                                    # For public ALB, tasks in private subnets with NAT Gateway is typical.
           Subnets: !Ref PrivateSubnetIds
           SecurityGroups:
-            - !GetAtt EcsTaskSecurityGroup.GroupId
+            - !GetAtt AppSecurityGroupId.GroupId
       LoadBalancers:
         - ContainerName: !Sub ${AppName}-Container
           ContainerPort: !Ref ContainerPort
