@@ -128,6 +128,7 @@ jobs:
               echo "Sourcing App Security Group ID from workspace..."
               cat exported_env.sh # Optional: print the contents for debugging
               . exported_env.sh # Source the file (the '.' command)
+              echo "Extracting App SG ID: ${APP_SG_ID}"
             else
               echo "Error: exported_env.sh not found in workspace!"
               exit 1
