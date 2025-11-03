@@ -8,6 +8,10 @@ Parameters:
   AppName:
     Type: String
     Default: everything-booking-app
+  ContainerPort:
+    Type: Number
+    Description: The port the application listens on inside the container.
+    Default: 3000
 
 Resources:
   # Security Group for the Application Load Balancer
