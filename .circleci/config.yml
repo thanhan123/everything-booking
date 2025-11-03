@@ -118,7 +118,6 @@ jobs:
     steps:
       - attach_workspace:
           at: .
-      - checkout
 
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
