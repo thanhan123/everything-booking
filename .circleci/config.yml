@@ -116,6 +116,8 @@ jobs:
     docker:
       - image: cimg/python:3.11  # or another image with aws-cli & cfn tools
     steps:
+      - attach_workspace:
+          at: .
       - checkout
 
       - aws-cli/setup:
