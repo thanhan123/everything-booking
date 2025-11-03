@@ -84,7 +84,7 @@ jobs:
               --template-file app-network-stack.yml \
               --stack-name ${APP_NAME}-Network \
               --capabilities CAPABILITY_NAMED_IAM \
-              --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME}
+              --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME} \
               --region ${AWS_REGION}
 
       - run:
