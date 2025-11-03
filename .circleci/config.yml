@@ -120,7 +120,12 @@ jobs:
     steps:
       - attach_workspace:
           at: .
-      
+
+      - aws-cli/setup:
+          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+          region: ${AWS_REGION}
+
       - run:
           name: Load AppSecurityGroupId
           command: |
@@ -133,11 +138,6 @@ jobs:
               echo "Error: exported_env.sh not found in workspace!"
               exit 1
             fi
-
-      - aws-cli/setup:
-          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
-          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
-          region: ${AWS_REGION}
 
       - run:
           name: Deploy database stack
