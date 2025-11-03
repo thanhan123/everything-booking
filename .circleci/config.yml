@@ -72,6 +72,40 @@ jobs:
     environment:
       APP_NAME: everything-booking
 
+  deploy-network-stack:
+    executor: aws-cli/default
+    steps:
+      - checkout
+      - aws-cli/setup
+      - run:
+          name: Deploy Network Stack (App Security Group)
+          command: |
+            aws cloudformation deploy \
+              --template-file app-network-stack.yml \
+              --stack-name ${APP_NAME}-Network \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME}
+
+      - run:
+          name: Extract AppSecurityGroupId
+          command: |
+            # Use 'describe-stacks' to get the output from the deployed stack
+            APP_SG_ID=$(aws cloudformation describe-stacks \
+              --stack-name ${APP_NAME}-Network \
+              --query 'Stacks[0].Outputs[?OutputKey==`AppSecurityGroupId`].OutputValue' \
+              --output text)
+            
+            # Store the ID as an environment variable for the next job
+            echo "export APP_SG_ID=${APP_SG_ID}" >> $BASH_ENV
+            
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+    environment:
+      APP_NAME: everything-booking
+
   deploy-database:
     docker:
       - image: cimg/python:3.11  # or another image with aws-cli & cfn tools
@@ -86,6 +120,9 @@ jobs:
       - run:
           name: Deploy database stack
           command: |
+            # The APP_SG_ID is now available in the shell environment
+            echo "Using App SG ID: ${APP_SG_ID}"
+
             aws cloudformation deploy \
               --stack-name ${APP_NAME}-database-FargateStack \
               --template-file db-ecs-stack.yml \
@@ -95,6 +132,7 @@ jobs:
                 SubnetIds=${AWS_SUBNET_IDS} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
+                AppSecurityGroupId=${APP_SG_ID} \
               --region ${AWS_REGION} \
               --no-fail-on-empty-changeset
     environment:
@@ -122,7 +160,12 @@ workflows:
 
   database-deploy:
     jobs:
+      - deploy-network-stack:
+          filters:
+            branches:
+              only: database-deploy-2
       - deploy-database:
+          requires: [deploy-network-stack]
           filters:
             branches:
               only: database-deploy-2

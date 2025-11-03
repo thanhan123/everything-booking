@@ -19,6 +19,9 @@ Parameters:
   PrivateSubnetIds:
     Type: CommaDelimitedList
     Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
+  AppSecurityGroupId:
+    Type: String
+    Description: The ID of the App Security Group imported from the network stack.
 
 Resources:
   # 🔹 Log Group for container logs
@@ -197,7 +200,7 @@ Resources:
     Properties:
       GroupId: !Ref DatabaseSecurityGroup
       IpProtocol: tcp
-      SourceSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference (Replace with App SG later)
+      SourceSecurityGroupId: !Ref AppSecurityGroupId # Self-reference (Replace with App SG later)
       FromPort: 5432
       ToPort: 5432
 

@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the Application Security Group and its rules.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of your existing VPC.
+  AppName:
+    Type: String
+    Default: everything-booking-app
+
+Resources:
+  # 🔹 Application Security Group
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Security group for the application services.
+      # Outbound traffic defaults to ALL/ALL, which is fine for initial deployment.
+
+  # 🔹 Output the SG ID so the next stack can consume it
+Outputs:
+  AppSecurityGroupId:
+    Description: The Security Group ID of the Application Service
+    Value: !Ref AppSecurityGroup
+    Export:
+      # Use an explicit name for cross-stack reference
+      Name: !Sub "${AppName}-AppSecurityGroupId"
