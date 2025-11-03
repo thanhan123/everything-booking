@@ -17,6 +17,7 @@ RUN npm run build
 # --- Production stage ---
 FROM base AS runner
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
@@ -31,4 +32,4 @@ COPY --from=build /app/prisma ./prisma
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["npx", "prisma", "migrate", "deploy", "&&", "npm", "start"]
+CMD npx prisma migrate deploy && npm start

@@ -68,6 +68,8 @@ jobs:
                 SubnetIds=${AWS_SUBNET_IDS} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
+                AppSecurityGroupId=${APP_SG_ID} \
+                ALBSecurityGroupId=${APP_ALB_SG_ID} \
               --region ${AWS_REGION}
     environment:
       APP_NAME: everything-booking
@@ -164,7 +166,7 @@ workflows:
       - build-and-push-docker-image:
           filters:
             branches:
-              only: main
+              only: hot-fix-3
           requires:
             - run-tests
 
@@ -180,9 +182,9 @@ workflows:
       - deploy-network-stack:
           filters:
             branches:
-              only: database-deploy-2
+              only: database-deploy
       - deploy-database:
           requires: [deploy-network-stack]
           filters:
             branches:
-              only: database-deploy-2
+              only: database-deploy

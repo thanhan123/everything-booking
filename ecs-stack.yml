@@ -68,6 +68,14 @@ Parameters:
     # For 1024 CPU: 2048, 3072, 4096, 5120, 6144, 7168, 8192
     Default: "512" # 0.5 GB
 
+  AppSecurityGroupId:
+    Type: String
+    Description: The ID of the App Security Group imported from the network stack.
+
+  ALBSecurityGroupId:
+    Type: String
+    Description: The ID of the ALB Security Group imported from the network stack.
+
 Resources:
   # --- IAM Roles ---
   # IAM Role for ECS Task Execution (Allows ECS to pull images, log to CloudWatch)
@@ -83,6 +91,16 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Path: /
+      Policies:
+        - PolicyName: AllowSecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables*
 
   # IAM Role for ECS Task (If your application needs to interact with other AWS services, e.g., S3, DynamoDB)
   # For a simple Express app, this might not be strictly necessary, but it's good practice.
@@ -119,46 +137,6 @@ Resources:
     Properties:
       ClusterName: !Sub ${AppName}-Cluster
 
-  # --- Security Groups ---
-  # Security Group for the Application Load Balancer
-  ALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ALB
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0 # Allow HTTP access from anywhere
-        # Add HTTPS if you plan to use it
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-ALB-SG
-
-  # Security Group for ECS Fargate Tasks
-  EcsTaskSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ECS Fargate tasks
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        # Allow traffic from the ALB to the container port
-        - IpProtocol: tcp
-          FromPort: !Ref ContainerPort
-          ToPort: !Ref ContainerPort
-          SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
-      SecurityGroupEgress:
-        - IpProtocol: -1 # Allow all outbound traffic (e.g., to the internet, databases)
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-ECS-Task-SG
-
   # --- Application Load Balancer (ALB) ---
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -166,7 +144,7 @@ Resources:
       Scheme: internet-facing # Or 'internal' if only accessible within VPC
       Subnets: !Ref SubnetIds
       SecurityGroups:
-        - !GetAtt ALBSecurityGroup.GroupId
+        - !Ref ALBSecurityGroupId
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-ALB
@@ -220,9 +198,16 @@ Resources:
             - ContainerPort: !Ref ContainerPort
               HostPort: !Ref ContainerPort # Not strictly needed for Fargate, but good practice
               Protocol: tcp
+          secrets:
+            - name: DATABASE_URL
+              valueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:DATABASE_URL::"
+            - name: AUTH_SECRET
+              valueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:AUTH_SECRET::"
           Environment:
             - Name: NODE_ENV
               Value: production
+            - Name: HOST
+              Value: 0.0.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -246,8 +231,8 @@ Resources:
                                    # or if ALB is internal and tasks are in private subnets with NAT Gateway.
                                    # For public ALB, tasks in private subnets with NAT Gateway is typical.
           Subnets: !Ref PrivateSubnetIds
-          SecurityGroups:
-            - !GetAtt EcsTaskSecurityGroup.GroupId
+          SecurityGroups: 
+            - !Ref AppSecurityGroupId
       LoadBalancers:
         - ContainerName: !Sub ${AppName}-Container
           ContainerPort: !Ref ContainerPort
