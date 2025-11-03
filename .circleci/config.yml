@@ -103,10 +103,12 @@ jobs:
             # Store the ID as an environment variable for the next job
             echo "${APP_SG_ID}"
             echo "export APP_SG_ID=${APP_SG_ID}" >> $BASH_ENV
+            cp $BASH_ENV exported_env.sh
             
       - persist_to_workspace:
           root: .
           paths:
+            - exported_env.sh
             - .
 
     environment:
@@ -118,6 +120,18 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      
+      - run:
+          name: Load AppSecurityGroupId
+          command: |
+            if [ -f exported_env.sh ]; then
+              echo "Sourcing App Security Group ID from workspace..."
+              cat exported_env.sh # Optional: print the contents for debugging
+              . exported_env.sh # Source the file (the '.' command)
+            else
+              echo "Error: exported_env.sh not found in workspace!"
+              exit 1
+            fi
 
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
