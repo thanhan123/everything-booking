@@ -129,34 +129,34 @@ jobs:
       - run:
           name: Load AppSecurityGroupId
           command: |
-            if [ -f exported_env.sh ]; then
-              echo "Sourcing App Security Group ID from workspace..."
-              cat exported_env.sh # Optional: print the contents for debugging
-              . exported_env.sh # Source the file (the '.' command)
-              echo "Extracting App SG ID: ${APP_SG_ID}"
-            else
-              echo "Error: exported_env.sh not found in workspace!"
-              exit 1
-            fi
+            
 
       - run:
           name: Deploy database stack
           command: |
-            # The APP_SG_ID is now available in the shell environment
-            echo "Using App SG ID: ${APP_SG_ID}"
+            if [ -f exported_env.sh ]; then
+              echo "Sourcing App Security Group ID from workspace..."
+              cat exported_env.sh # Optional: print the contents for debugging
+              . exported_env.sh # Source the file (the '.' command)
+              # The APP_SG_ID is now available in the shell environment
+              echo "Using App SG ID: ${APP_SG_ID}"
 
-            aws cloudformation deploy \
-              --stack-name ${APP_NAME}-database-FargateStack \
-              --template-file db-ecs-stack.yml \
-              --capabilities CAPABILITY_IAM \
-              --parameter-overrides \
-                ImageTag=${CIRCLE_SHA1} \
-                SubnetIds=${AWS_SUBNET_IDS} \
-                PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
-                VpcId=${AWS_VPC_ID} \
-                AppSecurityGroupId=${APP_SG_ID} \
-              --region ${AWS_REGION} \
-              --no-fail-on-empty-changeset
+              aws cloudformation deploy \
+                --stack-name ${APP_NAME}-database-FargateStack \
+                --template-file db-ecs-stack.yml \
+                --capabilities CAPABILITY_IAM \
+                --parameter-overrides \
+                  ImageTag=${CIRCLE_SHA1} \
+                  SubnetIds=${AWS_SUBNET_IDS} \
+                  PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
+                  VpcId=${AWS_VPC_ID} \
+                  AppSecurityGroupId=${APP_SG_ID} \
+                --region ${AWS_REGION} \
+                --no-fail-on-empty-changeset
+            else
+              echo "Error: exported_env.sh not found in workspace!"
+              exit 1
+            fi
     environment:
       APP_NAME: everything-booking
 
