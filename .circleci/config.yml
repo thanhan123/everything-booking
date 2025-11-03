@@ -84,18 +84,24 @@ jobs:
               --template-file app-network-stack.yml \
               --stack-name ${APP_NAME}-Network \
               --capabilities CAPABILITY_NAMED_IAM \
+              --region ${AWS_REGION}
               --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME}
 
       - run:
           name: Extract AppSecurityGroupId
           command: |
+            echo "call here"
             # Use 'describe-stacks' to get the output from the deployed stack
             APP_SG_ID=$(aws cloudformation describe-stacks \
+              --region ${AWS_REGION} \
               --stack-name ${APP_NAME}-Network \
               --query 'Stacks[0].Outputs[?OutputKey==`AppSecurityGroupId`].OutputValue' \
               --output text)
             
+            echo "call here 2"
+            
             # Store the ID as an environment variable for the next job
+            echo "${APP_SG_ID}"
             echo "export APP_SG_ID=${APP_SG_ID}" >> $BASH_ENV
             
       - persist_to_workspace:
