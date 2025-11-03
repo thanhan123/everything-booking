@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the Application Security Group and its rules.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of your existing VPC.
+  AppName:
+    Type: String
+    Default: everything-booking-app
+  ContainerPort:
+    Type: Number
+    Description: The port the application listens on inside the container.
+    Default: 3000
+
+Resources:
+  # Security Group for the Application Load Balancer
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 # Allow HTTP access from anywhere
+        # Add HTTPS if you plan to use it
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-ALB-SG
+
+  # 🔹 Application Security Group
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Security group for the application services.
+      # Outbound traffic defaults to ALL/ALL, which is fine for initial deployment.
+  
+  # This rule allows the ALB to talk to the App task on port 3000.
+  AppSGIngressFromALB:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref AppSecurityGroup # The App Security Group ID
+      IpProtocol: tcp
+      FromPort: !Ref ContainerPort # 3000
+      ToPort: !Ref ContainerPort # 3000
+      # CRITICAL
+      SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+
+  # 🔹 Output the SG ID so the next stack can consume it
+Outputs:
+  AppSecurityGroupId:
+    Description: The Security Group ID of the Application Service
+    Value: !Ref AppSecurityGroup
+    Export:
+      # Use an explicit name for cross-stack reference
+      Name: !Sub "${AppName}-AppSecurityGroupId"
+  ALBSecurityGroupId:
+    Description: The Security Group ID of the ALB
+    Value: !Ref ALBSecurityGroup
+    Export:
+      # Use an explicit name for cross-stack reference
+      Name: !Sub "${AppName}-ALBSecurityGroupId"

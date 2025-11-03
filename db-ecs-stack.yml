@@ -1,0 +1,289 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy PostgreSQL container to ECS Fargate
+
+Parameters:
+  AppName:
+    Type: String
+    Default: everything-booking-postgres-db
+  ContainerPort:
+    Type: Number
+    Default: 5432
+  ImageRepositoryName:
+    Type: String
+    Default: everything-booking-postgres-repo
+  ImageTag:
+    Type: String
+    Default: latest
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
+  AppSecurityGroupId:
+    Type: String
+    Description: The ID of the App Security Group imported from the network stack.
+
+Resources:
+  # 🔹 Log Group for container logs
+  EcsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}"
+      RetentionInDays: 14
+
+  # 🔹 EFS File System
+  EFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "${AppName}-efs"
+
+  # 🔹 EFS Mount Targets
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Select [0, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref DatabaseSecurityGroup
+
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref DatabaseSecurityGroup
+
+  # 🔹 EFS Access Point (for scoped folder)
+  EFSAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      PosixUser:
+        Uid: "999"
+        Gid: "999"
+      RootDirectory:
+        Path: /data
+        CreationInfo:
+          OwnerUid: "999"
+          OwnerGid: "999"
+          Permissions: "755"
+
+  # 🔹 ECS Task Role (Required for EFS Access Permissions)
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: [ecs-tasks.amazonaws.com] }
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: EFSMountPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'elasticfilesystem:ClientMount'
+                  - 'elasticfilesystem:ClientRootAccess'
+                Resource: !GetAtt EFSFileSystem.Arn
+                Condition:
+                  StringEquals:
+                    'elasticfilesystem:AccessPointArn': !GetAtt EFSAccessPoint.Arn
+              - Effect: Allow
+                Action:
+                  - 'elasticfilesystem:DescribeMountTargets'
+                Resource: '*'
+
+  # 🔹 ECS Execution Role
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Path: /
+      Policies:
+        - PolicyName: AllowSecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables*
+
+  # 🔹 ECS Task Definition
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-task"
+      Cpu: 512
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn # <--- ADDED: Task Role ARN
+      Volumes:
+        - Name: postgres-data
+          EFSVolumeConfiguration:
+            FileSystemId: !Ref EFSFileSystem
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref EFSAccessPoint
+      ContainerDefinitions:
+        - Name: postgres
+          Image: postgres:16
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          MountPoints:
+            - SourceVolume: postgres-data
+              ContainerPath: /var/lib/postgresql/data
+          Secrets:
+            - name: POSTGRES_USER
+              ValueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:POSTGRES_USER::"
+            - name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:POSTGRES_PASSWORD::"
+            - name: POSTGRES_DB
+              ValueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:POSTGRES_DB::"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref EcsLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Security group for ECS tasks DB and EFS mount targets
+
+  # 🔹 New Resource: EFS Ingress Rule (Port 2049)
+  EfsIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 2049
+      ToPort: 2049
+
+  # 🔹 New Resource: EFS Outbound Rule (Port 2049)
+  EfsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      DestinationSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 2049
+      ToPort: 2049
+      Description: Allow EFS access to mount target (outbound)
+
+  # 🔹 New Resource: Postgres Ingress Rule (Port 5432)
+  PostgresIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref AppSecurityGroupId # Self-reference (Replace with App SG later)
+      FromPort: 5432
+      ToPort: 5432
+
+  # 🔹 New Resource: EFS Outbound Rule (Port 2049)
+  PostgresEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      DestinationSecurityGroupId: !Ref DatabaseSecurityGroup # Self-reference
+      FromPort: 5432
+      ToPort: 5432
+
+  # 🔹 New Resource: General HTTPS Outbound Rule (For ECR/CloudWatch)
+  # Fargate tasks in private subnets MUST have this to pull the image and send logs.
+  GeneralHttpsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      CidrIp: 0.0.0.0/0 
+      FromPort: 443
+      ToPort: 443
+      Description: Allow outbound HTTPS for ECR, CloudWatch, and general AWS API access
+
+  # 🔹 New Resource: DNS Resolver Egress Rule (For Service Discovery)
+  # Allows task to query the VPC's DNS resolver for the Service Discovery record.
+  DnsEgressRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: udp # DNS primarily uses UDP
+      CidrIp: 0.0.0.0/0 # Simplest way to allow outbound DNS lookups
+      FromPort: 53
+      ToPort: 53
+      Description: Allow outbound DNS resolution for Service Discovery
+
+  # 🔹 New Resource: Cloud Map Private DNS Namespace
+  PrivateNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub "${AppName}.local" # Creates a domain like 'everything-booking-db.local'
+      Vpc: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-namespace"
+
+  # 🔹 New Resource: Service Discovery Service (The static DNS entry)
+  PostgresServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      # This name becomes the host part: 'postgres.everything-booking-db.local'
+      Name: postgres 
+      NamespaceId: !Ref PrivateNamespace
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        # MULTIVALUE routing policy returns up to 8 healthy task IPs, suitable for DB connection
+        RoutingPolicy: MULTIVALUE 
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  # --- ECS Cluster ---
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${AppName}-postgres-Cluster
+
+  # 🔹 ECS Service
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref EcsTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref DatabaseSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      # New Property: Links the service to the Service Discovery entry
+      ServiceRegistries:
+        - RegistryArn: !GetAtt PostgresServiceDiscovery.Arn # <-- ADDED
