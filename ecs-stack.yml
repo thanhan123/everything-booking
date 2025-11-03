@@ -246,7 +246,8 @@ Resources:
                                    # or if ALB is internal and tasks are in private subnets with NAT Gateway.
                                    # For public ALB, tasks in private subnets with NAT Gateway is typical.
           Subnets: !Ref PrivateSubnetIds
-          SecurityGroups: AppSecurityGroupId
+          SecurityGroups: 
+            - !Ref AppSecurityGroupId
       LoadBalancers:
         - ContainerName: !Sub ${AppName}-Container
           ContainerPort: !Ref ContainerPort
