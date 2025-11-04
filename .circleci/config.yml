@@ -5,6 +5,7 @@ orbs:
   node: circleci/node@5.0.0
   aws-cli: circleci/aws-cli@4.1.0
   aws-ecr: circleci/aws-ecr@9.5.4
+  path-filtering: circleci/path-filtering@0.1.3
 
 jobs:
   run-tests: # NEW JOB
@@ -41,7 +42,7 @@ jobs:
                 region: ${AWS_REGION}
           region: ${AWS_REGION}
           repo: everything-booking-app-repo
-          tag: ${CIRCLE_SHA1} # Use commit SHA as tag
+          tag: latest
           # Path to your Dockerfile and context if not in root
           dockerfile: Dockerfile
           # path: .
@@ -64,7 +65,7 @@ jobs:
               --capabilities CAPABILITY_IAM \
               --parameter-overrides \
                 AppName=${APP_NAME} \
-                ImageTag=${CIRCLE_SHA1} \
+                ImageTag=latest \
                 SubnetIds=${AWS_SUBNET_IDS} \
                 PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
                 VpcId=${AWS_VPC_ID} \
@@ -161,12 +162,21 @@ workflows:
   version: 2
   build-deploy:
     jobs:
-      - run-tests
+      - path-filtering/filter:
+          name: check-for-src-changes
+          mapping: |
+            src/.* build=true
+            Dockerfile build=true
+          base-revision: main
+
+      - run-tests:
+          requires:
+            - check-for-src-changes
 
       - build-and-push-docker-image:
           filters:
             branches:
-              only: hot-fix-3
+              only: main
           requires:
             - run-tests
 
