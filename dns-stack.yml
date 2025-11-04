@@ -39,16 +39,20 @@ Outputs:
     Description: Hosted Zone ID
     Value: !Ref HostedZone
     Export:
-      Name: !Join 
+      Name: !Join
         - "-"
-        - - !Join ["-", !Split ".", !Ref BaseDomainName]
+        - - !Join
+            - "-"
+            - !Split [".", !Ref BaseDomainName]
           - "HostedZoneId"
 
   CertificateArn:
     Description: Validated ACM Certificate ARN
     Value: !Ref AppCertificate
     Export:
-      Name: !Join 
+      Name: !Join
         - "-"
-        - - !Join ["-", !Split ".", !Ref BaseDomainName]
+        - - !Join
+            - "-"
+            - !Split [".", !Ref BaseDomainName]
           - "CertificateArn"
