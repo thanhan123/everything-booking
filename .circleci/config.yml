@@ -5,9 +5,6 @@ orbs:
   aws-cli: circleci/aws-cli@4.1.0
   aws-ecr: circleci/aws-ecr@9.5.4
 
-# ------------------------------
-# Jobs
-# ------------------------------
 jobs:
   check-for-src-changes:
     docker:
@@ -25,20 +22,15 @@ jobs:
 
             if echo "$CHANGED_FILES" | grep -E '^src/|Dockerfile'; then
               echo "✅ Relevant changes detected. Build will proceed."
-              echo "export SHOULD_BUILD=true" >> $BASH_ENV
+              echo "true" > build_flag.txt
             else
               echo "ℹ️ No relevant changes detected. Skipping build steps."
-              echo "export SHOULD_BUILD=false" >> $BASH_ENV
+              echo "false" > build_flag.txt
             fi
-      - run:
-          name: Show SHOULD_BUILD flag
-          command: |
-            . $BASH_ENV
-            echo "SHOULD_BUILD = $SHOULD_BUILD"
       - persist_to_workspace:
           root: .
           paths:
-            - .
+            - build_flag.txt
 
   run-tests:
     docker:
@@ -50,7 +42,7 @@ jobs:
       - run:
           name: Check if we should run tests
           command: |
-            . $BASH_ENV
+            SHOULD_BUILD=$(cat build_flag.txt)
             if [ "$SHOULD_BUILD" != "true" ]; then
               echo "🟡 No relevant code changes. Skipping tests."
               circleci step halt
@@ -73,7 +65,7 @@ jobs:
       - run:
           name: Check if we should build
           command: |
-            . $BASH_ENV
+            SHOULD_BUILD=$(cat build_flag.txt)
             if [ "$SHOULD_BUILD" != "true" ]; then
               echo "🟡 No relevant code changes. Skipping Docker build."
               circleci step halt
@@ -87,11 +79,6 @@ jobs:
           region: ${AWS_REGION}
       - aws-ecr/build_and_push_image:
           account_id: ${AWS_ACCOUNT_ID}
-          auth:
-            - aws-cli/setup:
-                aws_access_key_id: ${AWS_ACCESS_KEY_ID}
-                aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
-                region: ${AWS_REGION}
           region: ${AWS_REGION}
           repo: everything-booking-app-repo
           tag: latest
@@ -107,7 +94,7 @@ jobs:
       - run:
           name: Check if we should deploy
           command: |
-            . $BASH_ENV
+            SHOULD_BUILD=$(cat build_flag.txt)
             if [ "$SHOULD_BUILD" != "true" ]; then
               echo "🟡 No relevant code changes. Skipping deployment."
               circleci step halt
@@ -135,9 +122,6 @@ jobs:
     environment:
       APP_NAME: everything-booking
 
-# ------------------------------
-# Workflows
-# ------------------------------
 workflows:
   version: 2
   build-deploy:
