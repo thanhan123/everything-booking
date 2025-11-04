@@ -12,21 +12,10 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Detect if src/ or Dockerfile changed
+          name: Check for source or Dockerfile changes
           command: |
-            echo "🔍 Checking if 'src/' or 'Dockerfile' changed compared to main..."
-            git fetch origin main || true
-            CHANGED_FILES=$(git diff --name-only origin/main...HEAD || true)
-            echo "Changed files:"
-            echo "$CHANGED_FILES"
-
-            if echo "$CHANGED_FILES" | grep -E '^src/|Dockerfile'; then
-              echo "✅ Relevant changes detected. Build will proceed."
-              echo "true" > build_flag.txt
-            else
-              echo "ℹ️ No relevant changes detected. Skipping build steps."
-              echo "false" > build_flag.txt
-            fi
+            chmod +x .circleci/scripts/check_src_changes.sh
+            .circleci/scripts/check_src_changes.sh
       - persist_to_workspace:
           root: .
           paths:
@@ -40,13 +29,10 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Check if we should run tests
+          name: Check build flag and skip if false
           command: |
-            SHOULD_BUILD=$(cat build_flag.txt)
-            if [ "$SHOULD_BUILD" != "true" ]; then
-              echo "🟡 No relevant code changes. Skipping tests."
-              circleci step halt
-            fi
+            chmod +x .circleci/scripts/check_build_flag.sh
+            .circleci/scripts/check_build_flag.sh
       - run:
           name: Install dependencies
           command: npm ci
@@ -65,11 +51,8 @@ jobs:
       - run:
           name: Check if we should build
           command: |
-            SHOULD_BUILD=$(cat build_flag.txt)
-            if [ "$SHOULD_BUILD" != "true" ]; then
-              echo "🟡 No relevant code changes. Skipping Docker build."
-              circleci step halt
-            fi
+            chmod +x .circleci/scripts/check_build_flag.sh
+            .circleci/scripts/check_build_flag.sh
       - run:
           name: Install dependencies
           command: npm ci
@@ -99,11 +82,8 @@ jobs:
       - run:
           name: Check if we should deploy
           command: |
-            SHOULD_BUILD=$(cat build_flag.txt)
-            if [ "$SHOULD_BUILD" != "true" ]; then
-              echo "🟡 No relevant code changes. Skipping deployment."
-              circleci step halt
-            fi
+            chmod +x .circleci/scripts/check_build_flag.sh
+            .circleci/scripts/check_build_flag.sh
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
           aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
