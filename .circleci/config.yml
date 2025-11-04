@@ -36,9 +36,9 @@ jobs:
     docker:
       - image: cimg/node:18.20.2
     steps:
+      - checkout
       - attach_workspace:
           at: .
-      - checkout
       - run:
           name: Check if we should run tests
           command: |
@@ -58,9 +58,9 @@ jobs:
     docker:
       - image: cimg/node:18.20.2
     steps:
+      - checkout
       - attach_workspace:
           at: .
-      - checkout
       - setup_remote_docker
       - run:
           name: Check if we should build
@@ -93,9 +93,9 @@ jobs:
     docker:
       - image: cimg/base:2025.08
     steps:
+      - checkout
       - attach_workspace:
           at: .
-      - checkout
       - run:
           name: Check if we should deploy
           command: |
