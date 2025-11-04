@@ -107,6 +107,107 @@ jobs:
     environment:
       APP_NAME: everything-booking
 
+  deploy-network-stack:
+    executor: aws-cli/default
+    steps:
+      - checkout
+      - aws-cli/setup
+      - run:
+          name: Deploy Network Stack (App Security Group)
+          command: |
+            aws cloudformation deploy \
+              --template-file app-network-stack.yml \
+              --stack-name ${APP_NAME}-Network \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME} \
+              --region ${AWS_REGION}
+
+      - run:
+          name: Extract AppSecurityGroupId
+          command: |
+            echo "call here"
+            # Use 'describe-stacks' to get the output from the deployed stack
+            APP_SG_ID=$(aws cloudformation describe-stacks \
+              --region ${AWS_REGION} \
+              --stack-name ${APP_NAME}-Network \
+              --query 'Stacks[0].Outputs[?OutputKey==`AppSecurityGroupId`].OutputValue' \
+              --output text)
+            
+            echo "call here 2"
+            
+            # Store the ID as an environment variable for the next job
+            echo "${APP_SG_ID}"
+            echo "export APP_SG_ID=${APP_SG_ID}" >> $BASH_ENV
+            cp $BASH_ENV exported_env.sh
+            
+      - persist_to_workspace:
+          root: .
+          paths:
+            - exported_env.sh
+            - .
+
+    environment:
+      APP_NAME: everything-booking
+
+  deploy-database:
+    docker:
+      - image: cimg/python:3.11  # or another image with aws-cli & cfn tools
+    steps:
+      - attach_workspace:
+          at: .
+
+      - aws-cli/setup:
+          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+          region: ${AWS_REGION}
+
+      - run:
+          name: Deploy database stack
+          command: |
+            if [ -f exported_env.sh ]; then
+              echo "Sourcing App Security Group ID from workspace..."
+              cat exported_env.sh # Optional: print the contents for debugging
+              . exported_env.sh # Source the file (the '.' command)
+              # The APP_SG_ID is now available in the shell environment
+              echo "Using App SG ID: ${APP_SG_ID}"
+
+              aws cloudformation deploy \
+                --stack-name ${APP_NAME}-database-FargateStack \
+                --template-file db-ecs-stack.yml \
+                --capabilities CAPABILITY_IAM \
+                --parameter-overrides \
+                  ImageTag=${CIRCLE_SHA1} \
+                  SubnetIds=${AWS_SUBNET_IDS} \
+                  PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
+                  VpcId=${AWS_VPC_ID} \
+                  AppSecurityGroupId=${APP_SG_ID} \
+                --region ${AWS_REGION} \
+                --no-fail-on-empty-changeset
+            else
+              echo "Error: exported_env.sh not found in workspace!"
+              exit 1
+            fi
+    environment:
+      APP_NAME: everything-booking
+
+  deploy-dns:
+    executor: aws-cli/default
+    steps:
+      - checkout
+      - aws-cli/setup
+      - run:
+          name: Deploy DNS Stack (App Security Group)
+          command: |
+            aws cloudformation deploy \
+              --template-file dns-stack.yml \
+              --stack-name ${APP_NAME}-DNS \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides BaseDomainName=everything-booking.site AppDomainName=everything-booking.site \
+              --region ${AWS_REGION}
+
+    environment:
+      APP_NAME: everything-booking
+
 workflows:
   version: 2
   build-deploy:
@@ -121,3 +222,25 @@ workflows:
       - deploy-to-ecs-fargate:
           requires:
             - build-and-push-docker-image
+          filters:
+            branches:
+              only: main
+
+  dns-deploy:
+    jobs:
+      - deploy-dns:
+          filters:
+            branches:
+              only: dns-deploy
+
+  database-deploy:
+    jobs:
+      - deploy-network-stack:
+          filters:
+            branches:
+              only: database-deploy
+      - deploy-database:
+          requires: [deploy-network-stack]
+          filters:
+            branches:
+              only: database-deploy

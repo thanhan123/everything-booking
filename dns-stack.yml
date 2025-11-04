@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Creates a Route 53 Hosted Zone and requests a validated ACM Certificate
+  for the application's FQDN, exporting their IDs for use in the main stack.
+
+Parameters:
+  BaseDomainName:
+    Type: String
+    Description: The root domain name for the hosted zone (e.g., example.com).
+
+  AppDomainName:
+    Type: String
+    Description: The fully qualified domain name (FQDN) for the application endpoint (e.g., api.example.com).
+
+Resources:
+
+  # 1. Route 53 Hosted Zone
+  # This resource defines where the DNS records for the domain will live.
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Ref BaseDomainName
+      HostedZoneConfig:
+        Comment: Hosted zone for the application domain.
+
+  # 2. ACM Certificate Request
+  # Requests a certificate for the application's specific FQDN.
+  AppCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref AppDomainName
+      ValidationMethod: DNS # Recommended method for automation
+      SubjectAlternativeNames:
+        - !Ref AppDomainName # Explicitly adding the FQDN
+      DomainValidationOptions:
+        - DomainName: !Ref AppDomainName
+          HostedZoneId: !Ref HostedZone # Links validation to the created Hosted Zone
+
+  # 3. ACM Certificate Validation Record
+  # Creates the CNAME record needed by ACM to automatically validate domain ownership.
+  CertificateValidationRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Name
+      Type: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Type
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Value
+      HostedZoneId: !Ref HostedZone
+
+  # 4. Wait for Certificate Validation (Ensures Certificate is ISSUED before export)
+  # This resource links the certificate to the validation record, ensuring CFN waits
+  # for the certificate status to become 'Issued'.
+  CertificateValidation:
+    Type: AWS::CertificateManager::CertificateValidation
+    Properties:
+      CertificateArn: !Ref AppCertificate
+      ValidationRecords:
+        - !Ref CertificateValidationRecord
+
+Outputs:
+  HostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone.
+    Value: !Ref HostedZone
+    Export:
+      Name: !Sub ${AppDomainName}-HostedZoneId
+
+  CertificateArn:
+    Description: The ARN of the validated ACM Certificate.
+    Value: !Ref AppCertificate
+    Export:
+      Name: !Sub ${AppDomainName}-CertificateArn
+
+  AppDomainName:
+    Description: The FQDN used for the application.
+    Value: !Ref AppDomainName
+    Export:
+      Name: !Sub ${AppDomainName}-FQDN
