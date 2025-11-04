@@ -82,9 +82,9 @@ Parameters:
 Mappings:
   ImportValues:
     HostedZoneId:
-      Value: "everything-booking-site-HostedZoneId"
+      Value: !ImportValue "everything-booking-site-HostedZoneId"
     CertificateArn:
-      Value: "everything-booking-site-CertificateArn"
+      Value: !ImportValue "everything-booking-site-CertificateArn"
 
 Resources:
   # --- IAM Roles ---
