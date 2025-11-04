@@ -1,33 +1,85 @@
-# CircleCI 2.1 configuration
 version: 2.1
 
 orbs:
   node: circleci/node@5.0.0
   aws-cli: circleci/aws-cli@4.1.0
   aws-ecr: circleci/aws-ecr@9.5.4
-  path-filtering: circleci/path-filtering@0.1.3
 
+# ------------------------------
+# Jobs
+# ------------------------------
 jobs:
-  run-tests: # NEW JOB
+  check-for-src-changes:
     docker:
-      - image: cimg/node:18.20.2
+      - image: cimg/base:stable
     steps:
       - checkout
       - run:
-          name: Install Node.js dependencies
+          name: Detect if src/ or Dockerfile changed
+          command: |
+            echo "🔍 Checking if 'src/' or 'Dockerfile' changed compared to main..."
+            git fetch origin main || true
+            CHANGED_FILES=$(git diff --name-only origin/main...HEAD || true)
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+
+            if echo "$CHANGED_FILES" | grep -E '^src/|Dockerfile'; then
+              echo "✅ Relevant changes detected. Build will proceed."
+              echo "export SHOULD_BUILD=true" >> $BASH_ENV
+            else
+              echo "ℹ️ No relevant changes detected. Skipping build steps."
+              echo "export SHOULD_BUILD=false" >> $BASH_ENV
+            fi
+      - run:
+          name: Show SHOULD_BUILD flag
+          command: |
+            . $BASH_ENV
+            echo "SHOULD_BUILD = $SHOULD_BUILD"
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+  run-tests:
+    docker:
+      - image: cimg/node:18.20.2
+    steps:
+      - attach_workspace:
+          at: .
+      - checkout
+      - run:
+          name: Check if we should run tests
+          command: |
+            . $BASH_ENV
+            if [ "$SHOULD_BUILD" != "true" ]; then
+              echo "🟡 No relevant code changes. Skipping tests."
+              circleci step halt
+            fi
+      - run:
+          name: Install dependencies
           command: npm ci
       - run:
           name: Run tests
           command: npm test
-          
+
   build-and-push-docker-image:
     docker:
       - image: cimg/node:18.20.2
     steps:
+      - attach_workspace:
+          at: .
       - checkout
       - setup_remote_docker
       - run:
-          name: Install Node.js dependencies
+          name: Check if we should build
+          command: |
+            . $BASH_ENV
+            if [ "$SHOULD_BUILD" != "true" ]; then
+              echo "🟡 No relevant code changes. Skipping Docker build."
+              circleci step halt
+            fi
+      - run:
+          name: Install dependencies
           command: npm ci
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
@@ -43,15 +95,23 @@ jobs:
           region: ${AWS_REGION}
           repo: everything-booking-app-repo
           tag: latest
-          # Path to your Dockerfile and context if not in root
           dockerfile: Dockerfile
-          # path: .
 
   deploy-to-ecs-fargate:
     docker:
       - image: cimg/base:2025.08
     steps:
+      - attach_workspace:
+          at: .
       - checkout
+      - run:
+          name: Check if we should deploy
+          command: |
+            . $BASH_ENV
+            if [ "$SHOULD_BUILD" != "true" ]; then
+              echo "🟡 No relevant code changes. Skipping deployment."
+              circleci step halt
+            fi
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
           aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
@@ -75,126 +135,20 @@ jobs:
     environment:
       APP_NAME: everything-booking
 
-  deploy-network-stack:
-    executor: aws-cli/default
-    steps:
-      - checkout
-      - aws-cli/setup
-      - run:
-          name: Deploy Network Stack (App Security Group)
-          command: |
-            aws cloudformation deploy \
-              --template-file app-network-stack.yml \
-              --stack-name ${APP_NAME}-Network \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --parameter-overrides VpcId=${AWS_VPC_ID} AppName=${APP_NAME} \
-              --region ${AWS_REGION}
-
-      - run:
-          name: Extract AppSecurityGroupId
-          command: |
-            echo "call here"
-            # Use 'describe-stacks' to get the output from the deployed stack
-            APP_SG_ID=$(aws cloudformation describe-stacks \
-              --region ${AWS_REGION} \
-              --stack-name ${APP_NAME}-Network \
-              --query 'Stacks[0].Outputs[?OutputKey==`AppSecurityGroupId`].OutputValue' \
-              --output text)
-            
-            echo "call here 2"
-            
-            # Store the ID as an environment variable for the next job
-            echo "${APP_SG_ID}"
-            echo "export APP_SG_ID=${APP_SG_ID}" >> $BASH_ENV
-            cp $BASH_ENV exported_env.sh
-            
-      - persist_to_workspace:
-          root: .
-          paths:
-            - exported_env.sh
-            - .
-
-    environment:
-      APP_NAME: everything-booking
-
-  deploy-database:
-    docker:
-      - image: cimg/python:3.11  # or another image with aws-cli & cfn tools
-    steps:
-      - attach_workspace:
-          at: .
-
-      - aws-cli/setup:
-          aws_access_key_id: ${AWS_ACCESS_KEY_ID}
-          aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
-          region: ${AWS_REGION}
-
-      - run:
-          name: Deploy database stack
-          command: |
-            if [ -f exported_env.sh ]; then
-              echo "Sourcing App Security Group ID from workspace..."
-              cat exported_env.sh # Optional: print the contents for debugging
-              . exported_env.sh # Source the file (the '.' command)
-              # The APP_SG_ID is now available in the shell environment
-              echo "Using App SG ID: ${APP_SG_ID}"
-
-              aws cloudformation deploy \
-                --stack-name ${APP_NAME}-database-FargateStack \
-                --template-file db-ecs-stack.yml \
-                --capabilities CAPABILITY_IAM \
-                --parameter-overrides \
-                  ImageTag=${CIRCLE_SHA1} \
-                  SubnetIds=${AWS_SUBNET_IDS} \
-                  PrivateSubnetIds=${AWS_PRIVATE_SUBNET_IDS} \
-                  VpcId=${AWS_VPC_ID} \
-                  AppSecurityGroupId=${APP_SG_ID} \
-                --region ${AWS_REGION} \
-                --no-fail-on-empty-changeset
-            else
-              echo "Error: exported_env.sh not found in workspace!"
-              exit 1
-            fi
-    environment:
-      APP_NAME: everything-booking
-
+# ------------------------------
+# Workflows
+# ------------------------------
 workflows:
   version: 2
   build-deploy:
     jobs:
-      - path-filtering/filter:
-          name: check-for-src-changes
-          mapping: |
-            src/.* build true
-            Dockerfile build true
-          base-revision: main
-
+      - check-for-src-changes
       - run-tests:
           requires:
             - check-for-src-changes
-
       - build-and-push-docker-image:
-          filters:
-            branches:
-              only: main
           requires:
             - run-tests
-
       - deploy-to-ecs-fargate:
           requires:
             - build-and-push-docker-image
-          filters:
-            branches:
-              only: main
-
-  database-deploy:
-    jobs:
-      - deploy-network-stack:
-          filters:
-            branches:
-              only: database-deploy
-      - deploy-database:
-          requires: [deploy-network-stack]
-          filters:
-            branches:
-              only: database-deploy
