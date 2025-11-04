@@ -165,8 +165,8 @@ workflows:
       - path-filtering/filter:
           name: check-for-src-changes
           mapping: |
-            src/.* build=true
-            Dockerfile build=true
+            src/.* build true
+            Dockerfile build true
           base-revision: main
 
       - run-tests:
