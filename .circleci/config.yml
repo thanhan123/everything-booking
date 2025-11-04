@@ -222,9 +222,9 @@ workflows:
       - deploy-to-ecs-fargate:
           requires:
             - build-and-push-docker-image
-          filters:
-            branches:
-              only: main
+          # filters:
+          #   branches:
+          #     only: main
 
   dns-deploy:
     jobs:
