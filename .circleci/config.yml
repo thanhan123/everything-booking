@@ -79,11 +79,11 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - run:
-          name: Check if we should deploy
-          command: |
-            chmod +x .circleci/scripts/check_build_flag.sh
-            .circleci/scripts/check_build_flag.sh
+      # - run:
+      #     name: Check if we should deploy
+      #     command: |
+      #       chmod +x .circleci/scripts/check_build_flag.sh
+      #       .circleci/scripts/check_build_flag.sh
       - aws-cli/setup:
           aws_access_key_id: ${AWS_ACCESS_KEY_ID}
           aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
