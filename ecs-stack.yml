@@ -206,11 +206,10 @@ Resources:
   AppDNS:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId: !FindInMap [ImportValues, HostedZoneId, Value] # IMPORTED ID
-      Name: !FindInMap [ImportValues, AppDomainName, Value] # IMPORTED FQDN
+      HostedZoneId: !FindInMap [ImportValues, HostedZoneId, Value] # imported from mapping
+      Name: !Ref AppDomainName  # FIX: Use the parameter value directly
       Type: A
       AliasTarget:
-        # Point the domain name to the Load Balancer
         HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
         DNSName: !GetAtt LoadBalancer.DNSName
 
