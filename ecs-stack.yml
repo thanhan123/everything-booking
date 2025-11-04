@@ -77,14 +77,6 @@ Parameters:
     Description: The domain name of the application
     Default: "everything-booking.site"
 
-  ImportedHostedZoneId:
-    Type: String
-    Default: !ImportValue everything-booking-site-HostedZoneId
-
-  ImportedCertificateArn:
-    Type: String
-    Default: !ImportValue everything-booking-site-CertificateArn
-
 Resources:
   # --- IAM Roles ---
   # IAM Role for ECS Task Execution (Allows ECS to pull images, log to CloudWatch)
@@ -186,7 +178,7 @@ Resources:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: !Ref ImportedCertificateArn
+        - CertificateArn: !ImportValue everything-booking-site-CertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
@@ -209,7 +201,7 @@ Resources:
   AppDNS:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId: !Ref ImportedHostedZoneId
+      HostedZoneId: !ImportValue everything-booking-site-HostedZoneId
       Name: !Ref AppDomainName
       Type: A
       AliasTarget:
