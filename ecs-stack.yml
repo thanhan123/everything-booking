@@ -33,6 +33,7 @@ Parameters:
   ImportDomainName:
     Type: String
     Description: The FQDN used in the Network Setup Stack (e.g., api.bookingapp.com) to import resources.
+    Default: everything-booking.com
 
   # --- Network Parameters ---
   VpcId:
@@ -67,15 +68,19 @@ Parameters:
     Type: String
     Description: The ID of the Security Group for the App Tasks (must allow ingress from ALBSecurityGroup on port 3000).
 
+  AppDomainName:
+    Type: String    
+    Description: The domain name of the application
+    Default: "everything-booking.site"
+
+
 # --- Imported Values ---
 Mappings:
   ImportValues:
     HostedZoneId:
-      Value: !ImportValue !Sub "${ImportDomainName}-HostedZoneId"
+      Value: "everything-booking-site-HostedZoneId"
     CertificateArn:
-      Value: !ImportValue !Sub "${ImportDomainName}-CertificateArn"
-    AppDomainName:
-      Value: !ImportValue !Sub "${ImportDomainName}-FQDN"
+      Value: "everything-booking-site-CertificateArn"
 
 Resources:
   # --- IAM Roles ---
