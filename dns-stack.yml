@@ -15,7 +15,7 @@ Parameters:
 Resources:
 
   # 1. Route 53 Hosted Zone
-  # This resource defines where the DNS records for the domain will live.
+  # This is the container for DNS records for the domain.
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
@@ -29,34 +29,40 @@ Resources:
     Type: AWS::CertificateManager::Certificate
     Properties:
       DomainName: !Ref AppDomainName
-      ValidationMethod: DNS # Recommended method for automation
-      SubjectAlternativeNames:
-        - !Ref AppDomainName # Explicitly adding the FQDN
+      ValidationMethod: DNS
+      # SubjectAlternativeNames is a list, but since we are only requesting one domain, we can omit it
+      # or explicitly list the AppDomainName.
       DomainValidationOptions:
         - DomainName: !Ref AppDomainName
           HostedZoneId: !Ref HostedZone # Links validation to the created Hosted Zone
 
-  # 3. ACM Certificate Validation Record
-  # Creates the CNAME record needed by ACM to automatically validate domain ownership.
-  CertificateValidationRecord:
-    Type: AWS::Route53::RecordSet
+  # 3. ACM Certificate Validation Record Set Group
+  # IMPORTANT FIX: This uses the required 'Route53:RecordSetGroup' structure
+  # and the correct Fn::GetAtt syntax to access the validation record details.
+  CertificateValidationRecords:
+    Type: AWS::Route53::RecordSetGroup
     Properties:
-      Name: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Name
-      Type: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Type
-      TTL: '60'
-      ResourceRecords:
-        - !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Value
       HostedZoneId: !Ref HostedZone
+      # We use Fn::Join and Fn::GetAtt on the full array, which is supported
+      RecordSets:
+        - Name: !Join [ '', [ !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Name, '.' ] ]
+          Type: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Type
+          TTL: '60'
+          ResourceRecords:
+            - !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Value
 
-  # 4. Wait for Certificate Validation (Ensures Certificate is ISSUED before export)
-  # This resource links the certificate to the validation record, ensuring CFN waits
-  # for the certificate status to become 'Issued'.
+  # 4. Wait for Certificate Validation
+  # This resource links the certificate to the validation records, ensuring CFN waits
+  # for the certificate status to become 'Issued' before proceeding.
   CertificateValidation:
     Type: AWS::CertificateManager::CertificateValidation
     Properties:
       CertificateArn: !Ref AppCertificate
+      # This property requires a list of validation records, which we now get from the Route53 RecordSetGroup
+      ValidationMethod: DNS
+      DomainName: !Ref AppDomainName
       ValidationRecords:
-        - !Ref CertificateValidationRecord
+        - !Ref CertificateValidationRecords
 
 Outputs:
   HostedZoneId:
