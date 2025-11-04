@@ -13,7 +13,6 @@ Parameters:
     Description: Full domain (e.g., api.example.com)
 
 Resources:
-
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
@@ -40,10 +39,16 @@ Outputs:
     Description: Hosted Zone ID
     Value: !Ref HostedZone
     Export:
-      Name: !Sub ${BaseDomainName}-HostedZoneId
+      Name: !Join 
+        - "-"
+        - - !Join ["-", !Split ".", !Ref BaseDomainName]
+          - "HostedZoneId"
 
   CertificateArn:
     Description: Validated ACM Certificate ARN
     Value: !Ref AppCertificate
     Export:
-      Name: !Sub ${BaseDomainName}-CertificateArn
+      Name: !Join 
+        - "-"
+        - - !Join ["-", !Split ".", !Ref BaseDomainName]
+          - "CertificateArn"
