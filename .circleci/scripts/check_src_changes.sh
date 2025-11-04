@@ -1,26 +1,24 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
-echo "🔍 Checking for src/ or Dockerfile changes..."
+echo "🔍 Checking for source or Dockerfile changes since previous commit..."
 
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "❌ Not a git repository. Exiting."
-  echo "false" > build_flag.txt
-  exit 0
+# Get the previous commit
+BASE_REVISION=$(git rev-parse HEAD~1)
+CURRENT_REVISION=$(git rev-parse HEAD)
+
+echo "Comparing ${BASE_REVISION}...${CURRENT_REVISION}"
+
+# Default to no build
+BUILD_FLAG=false
+
+# Check for file changes in src/ or Dockerfile between last two commits
+if git diff --name-only "$BASE_REVISION" "$CURRENT_REVISION" | grep -E '^(src/|Dockerfile)'; then
+  BUILD_FLAG=true
 fi
 
-BASE_BRANCH="${BASE_BRANCH:-main}"
+# Save build flag result
+echo "${BUILD_FLAG}" > build_flag.txt
 
-# Fetch latest info to compare properly
-git fetch origin "${BASE_BRANCH}" --depth=1 || true
+echo "✅ Build flag set to: ${BUILD_FLAG}"
 
-# Compare changed files
-CHANGED_FILES=$(git diff --name-only "origin/${BASE_BRANCH}"...HEAD || true)
-
-if echo "$CHANGED_FILES" | grep -E '^(src/|Dockerfile)'; then
-  echo "✅ Detected changes in src/ or Dockerfile."
-  echo "true" > build_flag.txt
-else
-  echo "🟡 No relevant changes detected."
-  echo "false" > build_flag.txt
-fi
