@@ -40,10 +40,10 @@ Outputs:
     Description: Hosted Zone ID
     Value: !Ref HostedZone
     Export:
-      Name: !Sub "${BaseDomainName}-HostedZoneId"
+      Name: !Sub ${BaseDomainName}-HostedZoneId
 
   CertificateArn:
     Description: Validated ACM Certificate ARN
     Value: !Ref AppCertificate
     Export:
-      Name: !Sub "${BaseDomainName}-CertificateArn"
+      Name: !Sub ${BaseDomainName}-CertificateArn
