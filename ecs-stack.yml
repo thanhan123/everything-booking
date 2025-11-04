@@ -77,14 +77,13 @@ Parameters:
     Description: The domain name of the application
     Default: "everything-booking.site"
 
+  ImportedHostedZoneId:
+    Type: String
+    Default: !ImportValue everything-booking-site-HostedZoneId
 
-# --- Imported Values ---
-Mappings:
-  ImportValues:
-    HostedZoneId:
-      Value: !ImportValue "everything-booking-site-HostedZoneId"
-    CertificateArn:
-      Value: !ImportValue "everything-booking-site-CertificateArn"
+  ImportedCertificateArn:
+    Type: String
+    Default: !ImportValue everything-booking-site-CertificateArn
 
 Resources:
   # --- IAM Roles ---
@@ -187,7 +186,7 @@ Resources:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: !FindInMap [ImportValues, CertificateArn, Value]
+        - CertificateArn: !Ref ImportedCertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
@@ -210,8 +209,8 @@ Resources:
   AppDNS:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId: !FindInMap [ImportValues, HostedZoneId, Value] # imported from mapping
-      Name: !Ref AppDomainName  # FIX: Use the parameter value directly
+      HostedZoneId: !Ref ImportedHostedZoneId
+      Name: !Ref AppDomainName
       Type: A
       AliasTarget:
         HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
