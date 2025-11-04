@@ -33,7 +33,7 @@ Parameters:
   ImportDomainName:
     Type: String
     Description: The FQDN used in the Network Setup Stack (e.g., api.bookingapp.com) to import resources.
-    Default: everything-booking.com
+    Default: everything-booking.site
 
   # --- Network Parameters ---
   VpcId:
