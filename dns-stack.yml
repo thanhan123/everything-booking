@@ -6,16 +6,14 @@ Description: |
 Parameters:
   BaseDomainName:
     Type: String
-    Description: The root domain name for the hosted zone (e.g., example.com).
+    Description: Root domain (e.g., example.com)
 
   AppDomainName:
     Type: String
-    Description: The fully qualified domain name (FQDN) for the application endpoint (e.g., api.example.com).
+    Description: Full domain (e.g., api.example.com)
 
 Resources:
 
-  # 1. Route 53 Hosted Zone
-  # This is the container for DNS records for the domain.
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
@@ -23,7 +21,6 @@ Resources:
       HostedZoneConfig:
         Comment: Hosted zone for the application domain.
 
-  # 2. ACM Certificate Request
   AppCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
@@ -31,46 +28,22 @@ Resources:
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: !Ref AppDomainName
-          HostedZoneId: !Ref HostedZone 
+          HostedZoneId: !Ref HostedZone
+      SubjectAlternativeNames:
+        - !Ref AppDomainName
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppDomainName}-Certificate
 
-  # 3. ACM Certificate Validation Record
-  # FIX: We use 'DependsOn' to ensure the AppCertificate resource is created before 
-  # CloudFormation attempts to resolve the Fn::GetAtt path, bypassing the validator error.
-  CertificateValidationRecord:
-    Type: AWS::Route53::RecordSet
-    DependsOn: AppCertificate # Forces dependency resolution
-    Properties:
-      # FIX: Use !Join to access the name and append a trailing dot (.), which is a Route 53 requirement.
-      Name: !Join [ "", [ !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Name, "." ] ]
-      Type: !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Type
-      TTL: '60'
-      ResourceRecords:
-        - !GetAtt AppCertificate.DomainValidationOptions.0.ResourceRecord.Value
-      HostedZoneId: !Ref HostedZone
-
-  # 4. Wait for Certificate Validation
-  CertificateValidation:
-    Type: AWS::CertificateManager::CertificateValidation
-    Properties:
-      CertificateArn: !Ref AppCertificate
-      ValidationRecords:
-        - !Ref CertificateValidationRecord
-      
 Outputs:
   HostedZoneId:
-    Description: The ID of the Route 53 Hosted Zone.
+    Description: Hosted Zone ID
     Value: !Ref HostedZone
     Export:
       Name: !Sub ${AppDomainName}-HostedZoneId
 
   CertificateArn:
-    Description: The ARN of the validated ACM Certificate.
+    Description: Validated ACM Certificate ARN
     Value: !Ref AppCertificate
     Export:
       Name: !Sub ${AppDomainName}-CertificateArn
-
-  AppDomainName:
-    Description: The FQDN used for the application.
-    Value: !Ref AppDomainName
-    Export:
-      Name: !Sub ${AppDomainName}-FQDN
