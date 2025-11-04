@@ -68,6 +68,10 @@ Parameters:
     Type: String
     Description: The ID of the Security Group for the App Tasks (must allow ingress from ALBSecurityGroup on port 3000).
 
+  ALBSecurityGroupId:
+    Type: String
+    Description: The ID of the ALB Security Group imported from the network stack.
+
   AppDomainName:
     Type: String    
     Description: The domain name of the application
