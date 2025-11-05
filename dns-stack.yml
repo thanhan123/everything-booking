@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Creates a Route 53 Hosted Zone and requests a validated ACM Certificate
+  for the application's FQDN, exporting their IDs for use in the main stack.
+
+Parameters:
+  BaseDomainName:
+    Type: String
+    Description: Root domain (e.g., example.com)
+
+  AppDomainName:
+    Type: String
+    Description: Full domain (e.g., api.example.com)
+
+Resources:
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Ref BaseDomainName
+      HostedZoneConfig:
+        Comment: Hosted zone for the application domain.
+
+  AppCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref AppDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref AppDomainName
+          HostedZoneId: !Ref HostedZone
+      SubjectAlternativeNames:
+        - !Ref AppDomainName
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppDomainName}-Certificate
+
+Outputs:
+  HostedZoneId:
+    Description: Hosted Zone ID
+    Value: !Ref HostedZone
+    Export:
+      Name: !Join
+        - "-"
+        - - !Join
+            - "-"
+            - !Split [".", !Ref BaseDomainName]
+          - "HostedZoneId"
+
+  CertificateArn:
+    Description: Validated ACM Certificate ARN
+    Value: !Ref AppCertificate
+    Export:
+      Name: !Join
+        - "-"
+        - - !Join
+            - "-"
+            - !Split [".", !Ref BaseDomainName]
+          - "CertificateArn"

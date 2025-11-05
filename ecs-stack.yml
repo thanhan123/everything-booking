@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  CloudFormation template to deploy an Nextjs application to AWS ECS Fargate.
-  This template creates an ECS Cluster, Task Definition, Service,
-  Application Load Balancer, Target Group, Security Groups, and IAM Roles.
+  CloudFormation template to deploy a Next.js application to AWS ECS Fargate,
+  including an Application Load Balancer with HTTPS (Port 443) and Route 53 integration.
 
 Parameters:
   # --- Application Parameters ---
@@ -14,18 +13,16 @@ Parameters:
   ImageRepositoryName:
     Type: String
     Description: The name of your ECR repository (e.g., 'my-express-app-repo').
-    # This should match the ECR_REPOSITORY_NAME in your CircleCI config
     Default: everything-booking-app-repo
 
   ImageTag:
     Type: String
-    Description: The Docker image tag to deploy (e.g., 'latest' or a specific SHA from CircleCI).
-    # This will be passed from your CI/CD pipeline, e.g., CIRCLE_SHA1
+    Description: The Docker image tag to deploy (e.g., 'latest' or a specific SHA from CI/CD).
     Default: latest
 
   ContainerPort:
     Type: Number
-    Description: The port your Express.js application listens on inside the container.
+    Description: The port your application listens on inside the container (e.g., 3000).
     Default: 3000
 
   DesiredCount:
@@ -33,29 +30,28 @@ Parameters:
     Description: The desired number of running tasks for your service.
     Default: 1
 
+  ImportDomainName:
+    Type: String
+    Description: The FQDN used in the Network Setup Stack (e.g., api.bookingapp.com) to import resources.
+    Default: everything-booking.site
+
   # --- Network Parameters ---
   VpcId:
     Type: String
-    Description: The ID of the VPC where your ECS cluster and ALB will be deployed.
-    # You should use an existing VPC ID
-    # Example: vpc-0abcdef1234567890
+    Description: The ID of the VPC where your resources will be deployed.
 
   SubnetIds:
     Type: CommaDelimitedList
-    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
-    # Ensure these subnets are public for ALB if using a public ALB
-    # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
+    Description: A comma-separated list of PUBLIC subnet IDs for the ALB.
 
   PrivateSubnetIds:
     Type: CommaDelimitedList
-    Description: A comma-separated list of subnet IDs in your VPC where ECS tasks and ALB will run.
-    # Ensure these subnets are private for tasks
-    # Example: subnet-0abcdef1234567890,subnet-0fedcba9876543210
+    Description: A comma-separated list of PRIVATE subnet IDs for the ECS Tasks.
 
   # --- Resource Sizing Parameters ---
   TaskCpu:
     Type: String
-    Description: The CPU units for the Fargate task (e.g., 256, 512, 1024, 2048, 4096).
+    Description: The CPU units for the Fargate task.
     AllowedValues: [ "256", "512", "1024", "2048", "4096" ]
     Default: "256" # 0.25 vCPU
 
@@ -70,11 +66,16 @@ Parameters:
 
   AppSecurityGroupId:
     Type: String
-    Description: The ID of the App Security Group imported from the network stack.
+    Description: The ID of the Security Group for the App Tasks (must allow ingress from ALBSecurityGroup on port 3000).
 
   ALBSecurityGroupId:
     Type: String
     Description: The ID of the ALB Security Group imported from the network stack.
+
+  AppDomainName:
+    Type: String    
+    Description: The domain name of the application
+    Default: "everything-booking.site"
 
 Resources:
   # --- IAM Roles ---
@@ -129,9 +130,8 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /ecs/${AppName}-LogGroup
-      RetentionInDays: 7 # Adjust retention as needed
+      RetentionInDays: 7
 
-  # --- ECS Cluster ---
   EcsCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -141,7 +141,7 @@ Resources:
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Scheme: internet-facing # Or 'internal' if only accessible within VPC
+      Scheme: internet-facing
       Subnets: !Ref SubnetIds
       SecurityGroups:
         - !Ref ALBSecurityGroupId
@@ -154,7 +154,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 30
-      HealthCheckPath: / # Your Express.js health check endpoint
+      HealthCheckPath: / # Ensure your Next.js app responds with 200 on this path
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
@@ -163,34 +163,63 @@ Resources:
       Port: !Ref ContainerPort
       Protocol: HTTP
       VpcId: !Ref VpcId
-      TargetType: ip # Fargate uses IP addresses
+      TargetType: ip
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-TargetGroup
 
-  # ALB Listener (HTTP on port 80)
-  HTTPListener:
+  # --- ALB Listeners (Updated for HTTPS) ---
+
+  # Listener on Port 443 (HTTPS) - Primary Listener
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !ImportValue everything-booking-site-CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # Listener on Port 80 (HTTP) - Redirects all traffic to HTTPS
+  HTTPListenerRedirect:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
       DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301 # Permanent redirect (best for SEO)
 
-  # --- ECS Task Definition ---
+  # --- Route 53 RecordSet (NEW) ---
+  AppDNS:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue everything-booking-site-HostedZoneId
+      Name: !Ref AppDomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt LoadBalancer.DNSName
+
+  # --- ECS Task Definition (Includes HOST=0.0.0.0 recommendation) ---
   EcsTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub ${AppName}-TaskDefinition
       Cpu: !Ref TaskCpu
       Memory: !Ref TaskMemory
-      NetworkMode: awsvpc # Required for Fargate
+      NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
-      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn # Role for ECS agent
-      TaskRoleArn: !GetAtt EcsTaskRole.Arn # Role for your application
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
       ContainerDefinitions:
         - Name: !Sub ${AppName}-Container
           Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageRepositoryName}:${ImageTag}
@@ -198,7 +227,7 @@ Resources:
             - ContainerPort: !Ref ContainerPort
               HostPort: !Ref ContainerPort # Not strictly needed for Fargate, but good practice
               Protocol: tcp
-          secrets:
+          Secrets:
             - name: DATABASE_URL
               valueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/everything-booking/env-variables:DATABASE_URL::"
             - name: AUTH_SECRET
@@ -206,7 +235,7 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
-            - Name: HOST
+            - Name: HOST # CRITICAL for Node/Next.js in Docker
               Value: 0.0.0.0
           LogConfiguration:
             LogDriver: awslogs
@@ -218,32 +247,31 @@ Resources:
   # --- ECS Service ---
   EcsService:
     Type: AWS::ECS::Service
-    DependsOn: HTTPListener
+    DependsOn: HTTPSListener # Depend on the new HTTPS Listener
     Properties:
       Cluster: !Ref EcsCluster
       ServiceName: !Sub ${AppName}-Service
       TaskDefinition: !Ref EcsTaskDefinition
-      DesiredCount: !Ref DesiredCount
+      DesiredCount: !Ref DesiredCount # Integer Ref
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED # Set to ENABLED if tasks need public internet access (e.g., for outbound calls)
-                                   # or if ALB is internal and tasks are in private subnets with NAT Gateway.
-                                   # For public ALB, tasks in private subnets with NAT Gateway is typical.
+          AssignPublicIp: DISABLED
           Subnets: !Ref PrivateSubnetIds
-          SecurityGroups: 
+          # FIX: SecurityGroups must be a list/JSONArray
+          SecurityGroups:
             - !Ref AppSecurityGroupId
       LoadBalancers:
         - ContainerName: !Sub ${AppName}-Container
-          ContainerPort: !Ref ContainerPort
+          ContainerPort: !Ref ContainerPort # Integer Ref
           TargetGroupArn: !Ref TargetGroup
-      # Optional: Auto Scaling (uncomment and configure if needed)
-      HealthCheckGracePeriodSeconds: 60
+      # HealthCheckGracePeriodSeconds must be an integer (60 is correct)
+      HealthCheckGracePeriodSeconds: 60 
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
         DeploymentCircuitBreaker:
-          Enable: true
+          Enable: true 
           Rollback: true
       Tags:
         - Key: Name
@@ -261,6 +289,12 @@ Outputs:
     Value: !GetAtt LoadBalancer.DNSName
     Export:
       Name: !Sub ${AppName}-LoadBalancerDNS
+
+  AppURL:
+    Description: The application URL via HTTPS
+    Value: !Sub https://${ImportDomainName}
+    Export:
+      Name: !Sub ${AppName}-AppURL
 
   ServiceArn:
     Description: The ARN of the ECS Service
