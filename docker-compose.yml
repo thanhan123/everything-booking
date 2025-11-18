@@ -1,17 +1,4 @@
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: deps
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
   postgres:
     image: postgres:15
     container_name: bookingapp_postgres
@@ -24,15 +11,21 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      
-  pg-client:
-    image: postgres:15
-    container_name: bookingapp_pg_client
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    command: sh -c "npx prisma migrate deploy && npm run db:seed && npm run dev"
     depends_on:
       - postgres
-    stdin_open: true
-    tty: true
-    entrypoint: ["psql", "-h", "postgres", "-U", "booking_user", "-d", "booking_db"]
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
 
 volumes:
   postgres_data:
