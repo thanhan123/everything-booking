@@ -13,7 +13,7 @@ export default function SignInPage() {
             <form
                 onSubmit={(e) => {
                     e.preventDefault()
-                    signIn("credentials", { email, password, callbackUrl: "/dashboard/bookings" })
+                    signIn("credentials", { email, password, callbackUrl: "/" })
                 }}
                 className="space-y-4"
             >
