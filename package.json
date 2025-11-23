@@ -9,10 +9,8 @@
     "lint": "eslint",
     "tailwind:init": "tailwindcss init -p",
     "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
+    "test:watch": "jest --watch",
+    "db:seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

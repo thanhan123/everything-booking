@@ -219,6 +219,9 @@ workflows:
       - build-and-push-docker-image:
           requires:
             - run-tests
+          filters:
+            branches:
+              only: main
       - deploy-to-ecs-fargate:
           requires:
             - build-and-push-docker-image
