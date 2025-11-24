@@ -6,7 +6,8 @@ import { getToken } from "next-auth/jwt"
 const roleProtectedRoutes: Record<string, string[]> = {
     "/admin": ["ADMIN"],
     "/store-admin": ["ADMIN", "STORE_ADMIN"],
-    "/dashboard": ["ADMIN", "STORE_ADMIN"],
+    "/dashboard": ["ADMIN"],
+    "/dashboard/*": ["ADMIN", "STORE_ADMIN"],
 }
 
 export async function middleware(req: NextRequest) {

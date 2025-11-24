@@ -15,7 +15,7 @@ import { UserMenu } from "./UserMenu"
 
 const navItems = [
     { label: "Search", href: "/search" },
-    { label: "Dashboard", href: "/dashboard/bookings" },
+    { label: "Dashboard", href: "/dashboard" },
 ]
 
 export function Navbar() {
