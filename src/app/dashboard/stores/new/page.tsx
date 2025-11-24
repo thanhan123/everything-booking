@@ -1,16 +1,49 @@
-import { db } from "@/lib/db"
-import { CreateStoreForm } from "./store-form"
+"use client"
 
-export default async function NewStorePage() {
-    // Load all STORE_ADMIN role users
-    const storeAdmins = await db.user.findMany({
-        where: { role: "STORE_ADMIN" },
-    })
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import SearchStoreAdmin from "./SearchStoreAdmin"
+import { UserDTO } from "@/models/user"
+import { createStore } from "./store-actions"
+
+export default function NewStorePage() {
+    const [admin, setAdmin] = useState<UserDTO | null>(null)
+    const [storeName, setStoreName] = useState("")
+
+    async function handleSubmit() {
+        if (!admin) {
+            alert("Please select a store admin")
+            return
+        }
+
+        await createStore({
+            name: storeName,
+            adminId: admin.id,
+        })
+    }
 
     return (
-        <div className="p-8 max-w-lg mx-auto">
-            <h1 className="text-2xl font-semibold mb-6">Create Store</h1>
-            <CreateStoreForm storeAdmins={storeAdmins} />
+        <div className="max-w-xl mx-auto space-y-6">
+            <h1 className="text-2xl font-semibold">Create Store</h1>
+
+            <div>
+                <label className="text-sm font-medium">Store Name</label>
+                <Input value={storeName} onChange={(e) => setStoreName(e.target.value)} />
+            </div>
+
+            <div>
+                <label className="text-sm font-medium">Store Admin</label>
+                <SearchStoreAdmin onSelect={setAdmin} />
+
+                {admin && (
+                    <p className="mt-2 text-sm text-green-700">
+                        Selected: {admin.name} ({admin.email})
+                    </p>
+                )}
+            </div>
+
+            <Button onClick={handleSubmit}>Create Store</Button>
         </div>
     )
 }
