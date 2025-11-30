@@ -13,12 +13,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Booking {
+  id         String        @id @default(cuid())
+  userId     String
+  storeId    String
+  date       DateTime
+  status     BookingStatus @default(PENDING)
+  totalPrice Float?
+  notes      String?
+
+  user  User  @relation("BookingUserRelation", fields: [userId], references: [id])
+  store Store @relation("BookingStoreRelation", fields: [storeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
 model Store {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   adminId   String?
-  admin     User?    @relation("StoreAdminRelation", fields: [adminId], references: [id])
-  createdAt DateTime @default(now())
+  admin     User?     @relation("StoreAdminRelation", fields: [adminId], references: [id])
+  createdAt DateTime  @default(now())
+  bookings  Booking[] @relation("BookingStoreRelation")
 }
 
 model User {
@@ -33,6 +57,7 @@ model User {
   accounts Account[]
   sessions Session[]
   stores   Store[]   @relation("StoreAdminRelation")
+  bookings Booking[] @relation("BookingUserRelation")
 }
 
 enum Role {

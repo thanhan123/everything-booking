@@ -12,23 +12,39 @@ import {
 import { Menu } from "lucide-react"
 import { useState } from "react"
 import { UserMenu } from "./UserMenu"
-
-const navItems = [
-    { label: "Search", href: "/search" },
-    { label: "Dashboard", href: "/dashboard" },
-]
+import { useSession } from "next-auth/react"
 
 export function Navbar() {
     const [open, setOpen] = useState(false)
+    const { data: session, status } = useSession()
+
+    // If loading, prevent flicker
+    // if (status === "loading") {
+    //     return (
+    //         <nav className="bg-blue-600 text-white px-6 py-3 flex justify-between items-center">
+    //             <div className="text-xl font-bold">
+    //                 <Link href="/">BookingApp</Link>
+    //             </div>
+    //         </nav>
+    //     )
+    // }
+
+    const currentUser = session?.user
+    const isAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "STORE_ADMIN"
+
+    const navItems = [
+        { label: "Search", href: "/search" },
+        ...(isAdmin ? [{ label: "Dashboard", href: "/dashboard" }] : []),
+    ]
 
     return (
         <nav className="bg-blue-600 text-white px-6 py-3 flex justify-between items-center">
-            {/* Logo / Brand */}
+            {/* Logo */}
             <div className="text-xl font-bold">
                 <Link href="/">BookingApp</Link>
             </div>
 
-            {/* Desktop Nav */}
+            {/* Desktop */}
             <div className="hidden md:flex space-x-6">
                 {navItems.map((item) => (
                     <Link
@@ -42,7 +58,7 @@ export function Navbar() {
                 <UserMenu />
             </div>
 
-            {/* Mobile Menu */}
+            {/* Mobile */}
             <div className="md:hidden">
                 <Sheet open={open} onOpenChange={setOpen}>
                     <SheetTrigger asChild>
@@ -50,7 +66,7 @@ export function Navbar() {
                             <Menu className="h-5 w-5 text-white" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="right" className="bg-white">
+                    <SheetContent className="bg-white" side="right">
                         <SheetHeader>
                             <SheetTitle className="text-left text-lg font-bold text-gray-900">
                                 Menu

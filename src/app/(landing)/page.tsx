@@ -1,28 +1,30 @@
-'use client';
-
 import ServiceCard from "@/components/ServiceCard"
+import Link from "next/link"
+import { db } from "@/lib/db"
 
-export default function LandingPage() {
-    // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/services`)
-    // const services = await res.json()
-    const services = [
-        { id: 1, name: "Haircut", description: "Professional haircut service", price: 30 },
-        { id: 2, name: "Massage", description: "Relaxing full body massage", price: 60 },
-        { id: 3, name: "Consultation", description: "1-hour consultation session", price: 100 },
-    ]
+export default async function LandingPage() {
+    const stores = await db.store.findMany({
+        include: { admin: true },
+        orderBy: { createdAt: "desc" }
+    })
 
     return (
         <main className="p-8">
-            <h1 className="text-3xl font-bold mb-4">Available Services</h1>
-            <div className="grid grid-cols-3 gap-6">
-                {services.map((service) => (
-                    <ServiceCard
-                        key={service.id}
-                        name={service.name}
-                        description={service.description}
-                        price={service.price}
-                        onBook={() => alert(`Booking ${service.name}`)}
-                    />
+            <h1 className="text-3xl font-bold mb-4">Available Stores</h1>
+
+            {stores.length === 0 && (
+                <p className="text-gray-600">No stores available yet.</p>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {stores.map((store) => (
+                    <Link key={store.id} href={`/stores/${store.id}`}>
+                        <ServiceCard
+                            name={store.name}
+                            description={'aaaaa'}//{store.description ?? "No description provided"}
+                            price={30}//{store.priceRange ?? undefined}
+                        />
+                    </Link>
                 ))}
             </div>
         </main>
