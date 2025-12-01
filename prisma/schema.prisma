@@ -13,6 +13,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model RefreshToken {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  userId     String
+  ip         String? // optional: IP at issuance
+  userAgent  String? // optional: UA at issuance
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revoked    Boolean   @default(false)
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
 model Booking {
   id         String        @id @default(cuid())
   userId     String
@@ -54,10 +71,11 @@ model User {
   role          Role      @default(USER)
   passwordHash  String?
 
-  accounts Account[]
-  sessions Session[]
-  stores   Store[]   @relation("StoreAdminRelation")
-  bookings Booking[] @relation("BookingUserRelation")
+  accounts      Account[]
+  sessions      Session[]
+  stores        Store[]        @relation("StoreAdminRelation")
+  bookings      Booking[]      @relation("BookingUserRelation")
+  refreshTokens RefreshToken[]
 }
 
 enum Role {
